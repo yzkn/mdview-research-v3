@@ -1,0 +1,223 @@
+# v3 のモバイル対応の実現可能性検証（調査用。本体の CI とは別）。
+#
+# 手元には Android・iOS の道具を入れない（利用者の判断。2026-10-27）ので、組めるかをここで確かめる。
+# 結果は各ジョブの要約（Summary）に出し、組めた物は成果物として残す。
+# **1 つの段が落ちても先へ進め、どこまで通ったかを要約に書く**（検証なので、落ちたこと自体が結果）
+name: v3 mobile PoC
+
+on:
+  workflow_dispatch:
+  # 枝の名前は決めない（非公開の本体と、公開用のリポジトリの両方で流す）
+  push:
+    paths:
+      - "poc/v3-mobile/**"
+      - ".github/workflows/v3-mobile-poc.yml"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  DIOXUS_CLI_VERSION: "0.7.10"
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        # bash と書くと pipefail が付く（`| tail` で cargo の失敗を隠さない）
+        shell: bash
+        working-directory: poc/v3-mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust と Android の対象を入れる
+        # 版数はリポジトリの rust-toolchain.toml に従う
+        run: |
+          rustup show
+          rustup target add aarch64-linux-android x86_64-linux-android
+
+      - name: NDK の場所を決める
+        # ランナーに入っている NDK を使う。C の部品（ring など）を NDK の clang で組む
+        run: |
+          ndk="$ANDROID_NDK_LATEST_HOME"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          {
+            echo "NDK_HOME=$ndk"
+            echo "ANDROID_NDK_HOME=$ndk"
+            echo "JAVA_HOME=$JAVA_HOME_17_X64"
+            echo "CC_aarch64_linux_android=$bin/aarch64-linux-android24-clang"
+            echo "AR_aarch64_linux_android=$bin/llvm-ar"
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android24-clang"
+          } >> "$GITHUB_ENV"
+          ls "$bin" | grep -c clang
+
+      # **同梱の字体はリポジトリに無い**（21.56MB）。core は `include_bytes!` で読むので、組む前に取る
+      - name: 同梱の字体のキャッシュ
+        id: fonts
+        uses: actions/cache@v6
+        with:
+          path: assets/fonts
+          key: fonts-${{ hashFiles('tools/fetch-fonts.py') }}
+
+      - name: 同梱の字体を取得する
+        if: steps.fonts.outputs.cache-hit != 'true'
+        working-directory: .
+        run: python3 tools/fetch-fonts.py
+
+      - name: 同梱の字体を確認する
+        working-directory: .
+        run: python3 tools/fetch-fonts.py --check
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: poc/v3-mobile -> target
+          key: android
+
+      - name: "1. 本体の UI に依存しない部分（core）を Android 向けに組む"
+        id: core
+        continue-on-error: true
+        run: cargo build -p mdview-core --release --target aarch64-linux-android 2>&1 | tail -30
+
+      - name: "2. iced 0.14（窓と描画）を Android 向けに型検査する"
+        id: iced
+        continue-on-error: true
+        run: cargo check --manifest-path iced-android/Cargo.toml --target aarch64-linux-android 2>&1 | tail -40
+
+      - name: "3. Dioxus の CLI を入れる"
+        id: dx
+        continue-on-error: true
+        run: |
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall -y --force "dioxus-cli@$DIOXUS_CLI_VERSION"
+          dx --version
+
+      - name: "4. Dioxus の試作を APK に組む"
+        id: apk
+        if: steps.dx.outcome == 'success'
+        continue-on-error: true
+        working-directory: poc/v3-mobile/dioxus-app
+        run: dx bundle --platform android --release --no-default-features --features mobile
+
+      - name: APK を探す
+        if: steps.apk.outcome == 'success'
+        run: |
+          find target -name '*.apk' | head
+          mkdir -p out && find target -name '*.apk' -exec cp {} out/ \;
+          ls -l out
+
+      - uses: actions/upload-artifact@v7
+        if: steps.apk.outcome == 'success'
+        with:
+          name: mdview-v3-poc-android
+          path: poc/v3-mobile/out/*.apk
+          retention-days: 14
+
+      - name: 要約
+        if: always()
+        run: |
+          size=$(du -ch out/*.apk 2>/dev/null | tail -1 | cut -f1)
+          {
+            echo "## Android（aarch64-linux-android）"
+            echo "|段|結果|"
+            echo "|---|---|"
+            echo "|1. core を組む|${{ steps.core.outcome }}|"
+            echo "|2. iced 0.14 を型検査|${{ steps.iced.outcome }}|"
+            echo "|3. dx を入れる|${{ steps.dx.outcome }}|"
+            echo "|4. Dioxus の APK|${{ steps.apk.outcome }}（${size:-無し}）|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        # bash と書くと pipefail が付く（`| tail` で cargo の失敗を隠さない）
+        shell: bash
+        working-directory: poc/v3-mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust と iOS の対象を入れる
+        run: |
+          rustup show
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          xcodebuild -version
+
+      # **同梱の字体はリポジトリに無い**（21.56MB）。core は `include_bytes!` で読むので、組む前に取る
+      - name: 同梱の字体のキャッシュ
+        id: fonts
+        uses: actions/cache@v6
+        with:
+          path: assets/fonts
+          key: fonts-${{ hashFiles('tools/fetch-fonts.py') }}
+
+      - name: 同梱の字体を取得する
+        if: steps.fonts.outputs.cache-hit != 'true'
+        working-directory: .
+        run: python3 tools/fetch-fonts.py
+
+      - name: 同梱の字体を確認する
+        working-directory: .
+        run: python3 tools/fetch-fonts.py --check
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: poc/v3-mobile -> target
+          key: ios
+
+      - name: "1. 本体の UI に依存しない部分（core）を iOS 向けに組む"
+        id: core
+        continue-on-error: true
+        run: cargo build -p mdview-core --release --target aarch64-apple-ios 2>&1 | tail -30
+
+      - name: "2. iced 0.14（窓と描画）を iOS 向けに型検査する"
+        id: iced
+        continue-on-error: true
+        run: cargo check --manifest-path iced-android/Cargo.toml --target aarch64-apple-ios 2>&1 | tail -40
+
+      - name: "3. Dioxus の CLI を入れる"
+        id: dx
+        continue-on-error: true
+        run: |
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall -y --force "dioxus-cli@$DIOXUS_CLI_VERSION"
+          dx --version
+
+      - name: "4. Dioxus の試作をシミュレーター向けの .app に組む"
+        id: app
+        if: steps.dx.outcome == 'success'
+        continue-on-error: true
+        working-directory: poc/v3-mobile/dioxus-app
+        run: dx build --platform ios --release --no-default-features --features mobile
+
+      - name: .app を探す
+        if: steps.app.outcome == 'success'
+        run: |
+          find target -name '*.app' -type d | head
+          mkdir -p out
+          app=$(find target -name '*.app' -type d | head -1)
+          test -n "$app" && ditto -c -k --keepParent "$app" out/mdview-v3-poc-ios-sim.zip
+          ls -l out
+
+      - uses: actions/upload-artifact@v7
+        if: steps.app.outcome == 'success'
+        with:
+          name: mdview-v3-poc-ios-sim
+          path: poc/v3-mobile/out/*.zip
+          retention-days: 14
+
+      - name: 要約
+        if: always()
+        run: |
+          size=$(du -h out/*.zip 2>/dev/null | tail -1 | cut -f1)
+          {
+            echo "## iOS（aarch64-apple-ios / シミュレーター）"
+            echo "|段|結果|"
+            echo "|---|---|"
+            echo "|1. core を組む|${{ steps.core.outcome }}|"
+            echo "|2. iced 0.14 を型検査|${{ steps.iced.outcome }}|"
+            echo "|3. dx を入れる|${{ steps.dx.outcome }}|"
+            echo "|4. Dioxus の .app|${{ steps.app.outcome }}（${size:-無し}）|"
+          } >> "$GITHUB_STEP_SUMMARY"

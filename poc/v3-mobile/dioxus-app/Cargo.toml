@@ -1,0 +1,17 @@
+[package]
+name = "mdview-mobile-poc"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "閲覧中心＋軽い編集のモバイル版の試作（Dioxus。v3 の実現可能性検証）"
+
+[dependencies]
+mdview-core = { path = "../core" }
+dioxus = { version = "0.7", default-features = false, features = ["launch", "html", "macro", "signals", "hooks"] }
+
+[features]
+default = ["desktop"]
+# PC で動きを見る（Windows は WebView2）
+desktop = ["dioxus/desktop"]
+# Android・iOS（端末の WebView。`dx build --platform android|ios` で組む）
+mobile = ["dioxus/mobile"]

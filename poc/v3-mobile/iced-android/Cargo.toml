@@ -1,0 +1,15 @@
+# iced 0.14 を、本体と同じ機能のまま Android 向けに組めるかを見る（v3 のモバイル対応の検証）。
+# **型だけの iced（../iced-shim）と名前がぶつかるので、別の作業場にする**
+[workspace]
+
+[package]
+name = "iced-android-check"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+iced = { version = "0.14", features = ["advanced", "tokio", "image-without-codecs"] }

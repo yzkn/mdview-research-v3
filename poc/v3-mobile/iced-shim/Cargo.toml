@@ -1,0 +1,10 @@
+[package]
+# **名前を `iced` にする。** 本体のファイルは `iced::Color` などの型を名指しするので、同じ名前で
+# `iced_core`（窓も GPU も持たない純 Rust の部品）だけを差し出す。窓・描画（winit・wgpu）は入らない
+name = "iced"
+version = "0.14.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+iced_core = "0.14"
