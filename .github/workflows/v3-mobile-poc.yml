@@ -117,7 +117,9 @@ jobs:
       - name: 要約
         if: always()
         run: |
-          size=$(du -ch out/*.apk 2>/dev/null | tail -1 | cut -f1)
+          # **組めなかったときは out/ が無い。** du が落ちると pipefail と -e で表を書く前に終わる（2026-10-28 に踏んだ）
+          size=""
+          if ls out/*.apk >/dev/null 2>&1; then size=$(du -ch out/*.apk | tail -1 | cut -f1); fi
           {
             echo "## Android（aarch64-linux-android）"
             echo "|段|結果|"
@@ -211,7 +213,9 @@ jobs:
       - name: 要約
         if: always()
         run: |
-          size=$(du -h out/*.zip 2>/dev/null | tail -1 | cut -f1)
+          # **組めなかったときは out/ が無い。** du が落ちると pipefail と -e で表を書く前に終わる（2026-10-28 に踏んだ）
+          size=""
+          if ls out/*.zip >/dev/null 2>&1; then size=$(du -h out/*.zip | tail -1 | cut -f1); fi
           {
             echo "## iOS（aarch64-apple-ios / シミュレーター）"
             echo "|段|結果|"

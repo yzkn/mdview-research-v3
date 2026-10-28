@@ -30,20 +30,10 @@ pub mod search;
 #[path = "../../../../src/worker.rs"]
 pub mod worker;
 
-/// 継ぎ目: UI 層の描画（render）のうち、出力・図・数式が使うもの
-pub mod render {
-    #[path = "../../../../../src/render/backdrop.rs"]
-    pub mod backdrop;
-    #[path = "../../../../../src/render/fonts.rs"]
-    pub mod fonts;
-    #[path = "../../../../../src/render/slides.rs"]
-    pub mod slides;
-
-    /// 継ぎ目: 本体は render/preview.rs の配色を使う（PPTX の書き出し）。検証では字の色のまま
-    pub fn token_color(_role: crate::parse::highlight::TokenRole, text: iced::Color) -> iced::Color {
-        text
-    }
-}
+/// 継ぎ目: UI 層の描画（render）のうち、出力・図・数式が使うもの。
+/// **ファイルにしておく**（`mod render { … }` と書くと、`#[path]` が実在しない `core/src/render/` から `..` を辿り、
+/// Linux・macOS で読めない。Windows は文字の上で縮めるので通ってしまう。2026-10-28 に CI で踏んだ）
+pub mod render;
 
 /// 継ぎ目: 設定がコマンドの履歴の上限を UI 層から借りている
 pub mod app {

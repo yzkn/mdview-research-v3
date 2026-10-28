@@ -13,3 +13,8 @@ path = "lib.rs"
 
 [dependencies]
 iced = { version = "0.14", features = ["advanced", "tokio", "image-without-codecs"] }
+
+# **起動の方式はアプリが選ぶ**（winit が使う android-activity は、どちらかの機能が無いと組めない。2026-10-28 に CI で踏んだ）。
+# Java・Kotlin を書かずに済む native-activity にする
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }

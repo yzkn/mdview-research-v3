@@ -1176,6 +1176,7 @@ dependencies = [
 name = "iced-android-check"
 version = "0.0.0"
 dependencies = [
+ "android-activity",
  "iced",
 ]
 
