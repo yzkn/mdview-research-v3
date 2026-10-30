@@ -11,17 +11,17 @@ pub mod document;
 // 編集の道具（TeraPad から取り込んだもの）
 pub mod edit;
 pub mod embed;
-// PDF・HTML 出力（§17）
+// PDF・HTML 出力（基本設計書 §17）
 pub mod export;
 pub mod io;
 pub mod layout;
 pub mod marp;
-// PDF のページ分割（§5）
+// PDF のページ分割（詳細設計書 §5）
 pub mod paginate;
 pub mod parse;
 // 字体・見開きの組み方・字句の色（UI 層から移した継ぎ目。v3 R-01）
 pub mod render;
-// 文書内検索（§15.5）
+// 文書内検索（基本設計書 §15.5）
 pub mod search;
 // 別の糸の後始末（落ちた理由を拾う）
 pub mod worker;

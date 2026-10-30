@@ -1,0 +1,57 @@
+[package]
+name = "mdview-core"
+# **本体と同じ版数にする**（本体の試験 `core_version_matches_app` がそろっているかを見る）。
+# 土台の中の `CARGO_PKG_VERSION`（URL を読むときの User-Agent など）がこの値になるため
+version = "3.0.0"
+description = "mdview の土台（UI に依存しない部分）"
+authors = []
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+# **土台は窓と GPU の部品を持たない**（v3 R-01）。PC 版（iced）とモバイル版（Dioxus）で共有する。
+# 依存の選び方の理由は本体の Cargo.toml の注釈を正とする（同じものをここへ移した）
+[dependencies]
+# 色・矩形・字体などの値の型だけを使う。**名前を `iced` にする**（本体から移したコードが `iced::Color` と名指しするため）。
+# 窓・描画（winit・wgpu）は入らない
+iced = { package = "iced_core", version = "0.14" }
+ropey = "1.6"
+unicode-linebreak = "0.1"
+lru = "0.18"
+comrak = { version = "0.55", default-features = false }
+syntect = { version = "5.3", default-features = false, features = [
+    "parsing",
+    "default-syntaxes",
+    "regex-fancy",
+] }
+merman = "0.9.0"
+resvg = "0.45"
+serde_json = "1"
+ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "_ring", "platform-verifier", "gzip", "win-system-proxy"] }
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "io-std", "io-util", "net", "time", "macros"] }
+latex-rust = "2.1"
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "bmp",
+    "webp",
+] }
+regex = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+encoding_rs = "0.8"
+krilla = "0.8"
+similar = { version = "3.2.0", features = ["inline"] }
+ttf-parser = "0.25"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinHttp", "Win32_UI_Shell"] }
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+boa_engine = { version = "0.22", default-features = false }
+
+[dev-dependencies]
+# PAC の評価を、Linux 以外でも試験する
+boa_engine = { version = "0.22", default-features = false }

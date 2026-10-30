@@ -1,37 +1,60 @@
 name: CI
 
-# 検査（書式・Lint・試験）と、**配布物を組んで包む**ところまで（2026-10-13）。
+# v2.0.0 の検査（基本設計書 §27.2）。
 #
-# **3 OS で配るので 3 OS で検査する。** 環境の既定値（文字コード・ツールの版）は
-# OS ごとに違い、手元の 1 台では気づけない。
+# **既定は Linux だけにする。** private リポジトリでは実行分が課金され、
+# **倍率が OS で違う**（Linux ×1 / Windows ×2 / macOS ×10。基本設計書 §27.9）。
+# 3 OS を 1 回回すと約 119 分を使い、無料枠は月に 10 数回で尽きる。
 #
-# **配布物はここで組み、版数が新しければタグを打って Release まで作る**（2026-10-13）。
+#   - PR: **Linux の検査だけ**（約 8 分）。組まない・包まない・リリースしない
+#   - main への push: **Linux の検査だけ**（同上）
+#   - 手動起動: 選んだ OS で検査する。**Linux 以外を選んだら、組んで包み、本体の Release を作る**
 #
-#   - `check`（3 OS）: 検査 → 組む → GUI 試験 → 包む・煙試験 → 成果物 `dist-<OS>`
-#   - `release`（main への push のときだけ）: `Cargo.toml` の版の `v<版数>` が
-#     まだ無ければ、同じ実行の `dist-*` を載せてタグと Release を作る。
-#     **版数を上げていない push ではリリースしない**
+#     |選ぶもの|検査|リリース|
+#     |---|---|---|
+#     |linux（既定）|Linux|しない|
+#     |windows|Windows|する|
+#     |linux-windows|Linux・Windows|する|
+#     |all|3 OS|する|
 #
-#   - 以前は CI と Release がそれぞれ 3 OS で組んでいた（リリースのたびに 2 回ずつ）
-#   - **試験を通った実行ファイルそのものを配る。** 別に組み直すと、試験したものと
-#     配るものが別のビルドになる
-#   - 包むぶん CI は長くなるが、公開側へ push するのはリリースのときだけなので許す
-#   - **承認は挟まない**（配る速さを優先する）。問題があれば Release を下書きに戻す
-#     （docs/release.md「下書きに戻す」）
+# **あとから OS を足せる**（2026-10-15）: 手で起動するときに「足す先の Release」（例 `v2.2.1a`）を
+# 書くと、新しく作らずにその Release へ載せる。`linux` を選べば Linux 版だけを組んで足す。
+# **そのタグとアプリのソースが同じときだけ**（違うソースの物を混ぜない。CI や文書だけを直した
+# コミットからは足せる）。照合値と説明文は作り直す
+#
+# **本体のタグと Release は、手で起動したときだけ作る**（2026-10-15）。2026-10-13 に
+# 本体の Release（退避路）をやめたが、利用者が明示的に起動したときに限って戻した。
+# **公開側の Release と名前で区別する**: タグと Release の名前は版数に英字を付ける
+# （`v2.2.1a`。同じ版数で作り直すと `v2.2.1b`、`c` …）。公開側は `v2.2.1`。
+#
+# 組み立て・包み・煙試験・リリースの段は、公開側の ci.yml（migration-v2/.github/workflows/ci.yml。
+# 手書き）から写した。**どちらかを直したら、もう片方にも手で入れる**
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      os:
+        description: "検査する OS（linux 以外は、組んで包み、本体の Release を作る）"
+        type: choice
+        default: linux
+        options:
+          - linux
+          - windows
+          - linux-windows
+          - all
+      append_to:
+        description: "あとから足す先の本体の Release（例 v2.2.1a。アプリのソースが同じときだけ）。空なら新しく作る。足すときは linux も組む"
+        type: string
+        default: ""
 
-# **打ち切るのは PR だけ**（2026-10-13）。main への push で打ち切ると、release ジョブが
-# タグを打ったあと・成果物を載せている途中で止まり、「タグはあるのに Release が無い／欠けている」
-# 状態が残る。次の push は「配布済み」と見て何もしないので、**直らないまま**になる。
-# 公開側へ push するのはリリースのときだけなので、順に待っても困らない
+# **手で起動したリリースは打ち切らない**（2026-10-15）。打ち切ると、下書きの Release や
+# 成果物が欠けたまま残る。push と PR は、同じブランチの新しい実行で古いものを打ち切る
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
@@ -41,33 +64,32 @@ env:
 
 jobs:
   check:
-    name: 検査と組み立て（${{ matrix.label }}）
+    name: 検査（${{ matrix.label }}）
     runs-on: ${{ matrix.os }}
+    env:
+      # **組んで包むのは、手で起動して Linux 以外を選んだときだけ**（費用を抑える）
+      # 足す先を書いたときは linux でも組む
+      PACKAGE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.os != '' && (github.event.inputs.os != 'linux' || github.event.inputs.append_to != '') }}
+      # **組み方**（2026-10-16）。配るときだけ `dist`（fat LTO。実行ファイルが小さいが、組み立てが
+      # 2〜3 倍かかる）。普段の検査は `release`（thin）。試験するのは、包む物と同じ組み方のもの
+      PROFILE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.os != '' && (github.event.inputs.os != 'linux' || github.event.inputs.append_to != '')) && 'dist' || 'release' }}
     strategy:
-      # **1 つ失敗しても他は続ける。** どの OS が駄目なのかを一度に知りたい。
-      # Linux や macOS が落ちても、Windows の配布物があれば release ジョブは配る
       fail-fast: false
       matrix:
-        include:
-          # **ubuntu-latest にしない**（2026-10-13）。Linux の実行ファイルは組んだ環境の
-          # glibc 以上を要求する（24.04 で組むと glibc 2.39 以上）。latest が新しい Ubuntu に
-          # 切り替わった日に要求が上がり、まっさらな環境の起動試験（Debian 13 = glibc 2.41）と
-          # 利用者の手元（Ubuntu 24.04 など）で起動できなくなる。上げるときは README の
-          # 「動く環境」と一緒に、意図して上げる
-          - os: ubuntu-24.04
-            label: linux-x86_64
-            target: x86_64-unknown-linux-gnu
-            binary: mdview
-          - os: windows-latest
-            label: windows-x86_64
-            target: x86_64-pc-windows-msvc
-            binary: mdview.exe
-          # **macOS は Apple Silicon だけ作る。**
-          # Intel Mac 向けは、必要になった時点で足す
-          - os: macos-latest
-            label: macos-aarch64
-            target: aarch64-apple-darwin
-            binary: mdview
+        # **OS は手で起動したときに選ぶ**（§27.9）。押していないとき（push・PR）は Linux だけ。
+        #
+        # 以前はこれを決めるためだけに別のジョブを置いていたが、
+        # **ジョブは 1 分未満でも 1 分として課金される。** 式で足りる。
+        #
+        # `github.event.inputs` はどの引き金でも参照でき、押していないときは空になる。
+        #
+        # **Linux は ubuntu-24.04 に固定する**（公開側と同じ。latest が変わると、組んだ
+        # 実行ファイルが要求する glibc が上がる）
+        include: ${{ fromJSON(
+          github.event.inputs.os == 'windows' && '[{"os":"windows-latest","label":"windows-x86_64","target":"x86_64-pc-windows-msvc","binary":"mdview.exe"}]'
+          || github.event.inputs.os == 'linux-windows' && '[{"os":"ubuntu-24.04","label":"linux-x86_64","target":"x86_64-unknown-linux-gnu","binary":"mdview"},{"os":"windows-latest","label":"windows-x86_64","target":"x86_64-pc-windows-msvc","binary":"mdview.exe"}]'
+          || github.event.inputs.os == 'all' && '[{"os":"ubuntu-24.04","label":"linux-x86_64","target":"x86_64-unknown-linux-gnu","binary":"mdview"},{"os":"windows-latest","label":"windows-x86_64","target":"x86_64-pc-windows-msvc","binary":"mdview.exe"},{"os":"macos-latest","label":"macos-aarch64","target":"aarch64-apple-darwin","binary":"mdview"}]'
+          || '[{"os":"ubuntu-24.04","label":"linux-x86_64","target":"x86_64-unknown-linux-gnu","binary":"mdview"}]') }}
 
     steps:
       - uses: actions/checkout@v7
@@ -84,9 +106,33 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           df -h /
 
+      # **公開用の複製（migration-v2/）が最新か**（2026-10-13）。
+      #
+      # 公開側へは、公開用 PC で公開側の clone に migration-v2/ の中身だけを置き、
+      # コミットして push する。向こうでは作り直せないので、**作り直し忘れのまま push すると
+      # 古いものがそのまま公開される。** ここで作り直して、差分が出たら落とす
+      #
+      # **Dependabot の PR では見ない。** 依存を上げる PR は Cargo.lock を変えるが、複製
+      # （migration-v2/Cargo.lock）は作り直さないので、毎回ここで落ちる。取り込んだあとの
+      # main では落ちるままにする（配る前に作り直す合図）
+      - name: 公開用の複製が最新か
+        if: runner.os == 'Linux' && github.actor != 'dependabot[bot]'
+        run: |
+          python3 tools/build-public-copy.py
+          # **索引に載せてから比べる**（2026-10-15）。`git status` は改行の違い（取り出した
+          # CRLF と書いた LF）だけでも「変わった」と出し、6f75c31 から一度も通らなかった。
+          # 載せると .gitattributes どおりにそろうので、中身の違いだけが残る（増えたものも拾う）
+          git add -A -- migration-v2
+          changed=$(git diff --cached --name-status -- migration-v2)
+          if [ -n "$changed" ]; then
+            echo "公開用の複製が古い。手元で python tools/build-public-copy.py を実行してコミットする:"
+            echo "$changed" | head -50
+            exit 1
+          fi
+          echo "公開用の複製は最新"
+
       - name: Rust ツールチェーンを用意する
-        # **版は rust-toolchain.toml で固定している。** `stable` のままにすると
-        # 手元と CI が別の版になり、clippy の指摘が増えた版で CI だけが落ちる
+        # 版数は rust-toolchain.toml に従う
         run: |
           rustup show
           rustup component add rustfmt clippy
@@ -127,30 +173,37 @@ jobs:
       # 同じなら、できるものも同じ。当たれば example を組む・つなぐ（fat LTO）時間を丸ごと省く
       - name: アイコンのキャッシュ
         id: icons
+        if: env.PACKAGE == 'true'
         uses: actions/cache@v6
         with:
           path: assets/icons
           key: icons-${{ runner.os }}-${{ hashFiles('assets/icon.svg', 'assets/icon-small.svg', 'assets/icon-doc.svg', 'examples/make-icons.rs', 'Cargo.lock') }}
 
-      # **検査より先に作る。** `build.rs` が Windows の実行ファイルへ埋めるため、
-      # この時点で `assets/icons/mdview.ico` が要る。無いと黙って埋めずに通り、
-      # アイコンと版数の無い実行ファイルを試験していた。
-      # **ビルドと同じ `dist` で作る。** example も本体の依存を全部組むので、組み方が違うと依存を
+      # **配るときは検査より先に作る**（公開側と同じ）。`build.rs` が Windows の実行ファイルへ
+      # 埋めるため、組む時点で `assets/icons/mdview.ico` が要る。無いと黙って埋めずに通る。
+      # 検査だけのときは作らない（費用を抑える。試験はアイコンに依らない）
+      # **ビルドと同じ組み方で作る。** example も本体の依存を全部組むので、組み方が違うと依存を
       # 2 回組む（release で作っていたとき、Windows で約 13 分余計にかかった。2026-10-16）
       - name: アイコンを作る
-        if: steps.icons.outputs.cache-hit != 'true'
-        run: cargo run --profile dist --target ${{ matrix.target }} --example make-icons
+        if: env.PACKAGE == 'true' && steps.icons.outputs.cache-hit != 'true'
+        run: cargo run --profile ${{ env.PROFILE }} --target ${{ matrix.target }} --example make-icons
 
       - name: 書式
         run: cargo fmt --all --check
+
+      # **依存の著作権表示の一覧が最新か**（v2.6.0 R-01）。実行ファイルに埋めて About で見せる一覧で、
+      # 依存を変えたのに作り直し忘れると古い一覧のまま配ってしまう。Linux だけで見る（OS を問わず同じ一覧）
+      - name: 著作権表示の一覧が最新か
+        if: runner.os == 'Linux' && github.actor != 'dependabot[bot]'
+        run: python3 tools/build-licenses.py --check
 
       - name: Lint
         # **土台（core/）も見る**（v3 R-01 で作業場を 2 つのクレートにした。--workspace が無いと本体しか見ない）
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: テスト
-        # レイアウト層は描画層に依存しないため、ウィンドウ無しで試験できる。
-        # **画面の見た目は CI では確かめられない**（字形・IME・滑らかさ）
+        # レイアウト層は描画層に依存しないため、ウィンドウ無しで試験できる
+        # （基本設計書 §22.1）。**画面の見た目は CI では確かめられない**（§27.5）
         run: cargo test --workspace
 
       - name: macOS の起動用を型検査する
@@ -160,15 +213,14 @@ jobs:
         run: swiftc -typecheck packaging/macos/launcher/main.swift
 
       # **配るものと同じ組み方で組む**（`--target` 付き）。GUI 試験もこれを試す。
-      # **`dist` で組む**（2026-10-16。Cargo.toml。release に fat LTO を足したもの。実行ファイルが
-      # 小さくなる代わりに組み立てが延びる。ここは毎回包んで配りうるので、いつも dist）
+      # 試験を通った実行ファイルそのものを包んで配る
       - name: ビルド
-        run: cargo build --profile dist --target ${{ matrix.target }}
+        run: cargo build --profile ${{ env.PROFILE }} --target ${{ matrix.target }}
 
       # --- GUI 試験（v2.1.0） ---
       #
       # 試験用の操作口（`--automation`）で、要件の項目を 1 つずつ確かめる
-      # （docs/GUI自動テストの方針.md）。**窓が要る**ので、Linux は仮想の画面（Xvfb）で動かす。
+      # （doc/GUI自動テストの方針.md）。**窓が要る**ので、Linux は仮想の画面（Xvfb）で動かす。
       # Windows でしか確かめられない項目（最前面・作業領域）は、他の OS では「未確認」と出る
       - name: Linux の仮想の画面を用意する
         if: runner.os == 'Linux'
@@ -180,7 +232,7 @@ jobs:
       - name: GUI 試験（要件の確認）
         shell: bash
         env:
-          EXE: target/${{ matrix.target }}/dist/${{ matrix.binary }}
+          EXE: target/${{ matrix.target }}/${{ env.PROFILE }}/${{ matrix.binary }}
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             xvfb-run -a -s "-screen 0 1920x1080x24" python3 tools/automation/spec_test.py --exe "$EXE" --shots gui-shots
@@ -196,15 +248,17 @@ jobs:
           path: gui-shots
           if-no-files-found: ignore
 
-      # --- 配布物を組む（Release はこれを載せる） ---
+      # --- 配布物を組む（ここから下は、手で起動して Linux 以外を選んだときだけ） ---
+      #
+      # **公開側の ci.yml から写した。** 段の中身の理由は向こうの注釈を見る
       - name: 名前を付けて集める
+        if: env.PACKAGE == 'true'
         shell: bash
-        # 受け取った側が「どれを落とせばよいか」で迷わないよう、名前に OS と CPU を入れる
         run: |
           version=$(grep -m1 '^version' Cargo.toml | cut -d '"' -f 2)
           mkdir -p dist
           name="mdview-${version}-${{ matrix.label }}"
-          source="target/${{ matrix.target }}/dist/${{ matrix.binary }}"
+          source="target/${{ matrix.target }}/${{ env.PROFILE }}/${{ matrix.binary }}"
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "$source" "dist/${name}.exe"
           else
@@ -213,41 +267,28 @@ jobs:
           fi
           ls -la dist
 
-      # --- Linux の包み（B-5） ---
-      #
-      # **`bash` を頭に付けて呼ぶ。** 実行ビットに頼らない。
-      # Windows では実行ビットを持てず、`git add` で 100644 になる。
-      # 実際、2026-10-05 の v2.0.0 で 3 OS すべてが
-      # `Permission denied`（終了コード 126）で落ちた。
-      # 索引の実行ビットも立て直したが、**公開用の複製を作り直すと再び失われる**
-      # ため、呼び方のほうで断つ。
+      # **`bash` を頭に付けて呼ぶ。** 実行ビットに頼らない（Windows で付けた索引は 100644）
       - name: deb を組む
-        if: runner.os == 'Linux'
+        if: env.PACKAGE == 'true' && runner.os == 'Linux'
         run: |
           bash packaging/linux/build-deb.sh \
-            "target/${{ matrix.target }}/dist/mdview" dist
+            "target/${{ matrix.target }}/${{ env.PROFILE }}/mdview" dist
 
       - name: AppImage を組む
-        if: runner.os == 'Linux'
+        if: env.PACKAGE == 'true' && runner.os == 'Linux'
         run: |
           bash packaging/linux/build-appimage.sh \
-            "target/${{ matrix.target }}/dist/mdview" dist
+            "target/${{ matrix.target }}/${{ env.PROFILE }}/mdview" dist
 
-      # **入れて・起動して・消せるかを確かめる**（B-8）
       - name: deb の煙試験
-        if: runner.os == 'Linux'
+        if: env.PACKAGE == 'true' && runner.os == 'Linux'
         run: |
           set -eu
           package=$(ls dist/*.deb)
           echo "試す: $package"
-          # **`dpkg -i` ではなく `apt-get install ./…` で入れる。** 受け取った側と同じ経路にする。
-          # `dpkg` は足りない依存を取りに行かず、ランナーに無い依存
-          # （v2.1.1 で足した libxkbcommon-x11-0）で設定に失敗していた
+          # `dpkg -i` ではなく `apt-get install ./…`（受け取った側と同じ経路。依存を取りに行く）
           sudo apt-get update >/dev/null
           sudo apt-get install -y "./$package"
-
-          # 依存の漏れはここでは分からない（ランナーには大抵のものが入っている）。
-          # 次の「まっさらな環境で deb を起動する」が見る
           echo "依存: $(dpkg-deb -f "$package" Depends)"
 
           test -x /usr/bin/mdview || { echo "入ったはずの実行ファイルが無い"; exit 1; }
@@ -256,7 +297,6 @@ jobs:
           expected="mdview $(grep -m1 '^version' Cargo.toml | cut -d '"' -f 2)"
           [ "$version" = "$expected" ] || { echo "版数が違う: $version（期待: $expected）"; exit 1; }
 
-          # **メニューの定義が妥当か確かめる。** 壊れていると一覧に出ない
           sudo apt-get install -y desktop-file-utils >/dev/null
           desktop-file-validate /usr/share/applications/mdview.desktop
 
@@ -264,31 +304,10 @@ jobs:
           test ! -e /usr/bin/mdview || { echo "消したはずの実行ファイルが残っている"; exit 1; }
           echo "入れて・起動して・消せた"
 
-      # **まっさらな環境に依存だけを入れ、窓を出して描けるかを見る。**
-      #
-      # 上の煙試験は `--version` だけで窓を出さないうえ、ランナーには大抵の
-      # ライブラリが入っている。winit が実行時に読み込む（dlopen）ものが Depends から
-      # 漏れていても通ってしまい、v2.1.1 で 2 度、利用者の手元で落ちる形で踏んだ
-      # （libxkbcommon-x11・libXcursor ほか）。
-      #
-      # **Debian 13 に固定する**（stable は版が変わると glibc と包みの名前が変わる）。
-      #
-      # `--no-install-recommends` で **Depends だけ**を入れる。2 段に分ける:
-      #
-      #   1. `.deb` だけを入れて、実行時に読み込むライブラリがそろっているかを見る。
-      #      **xvfb より先に見る。** xvfb は libX11・libX11-xcb を連れてくるので、
-      #      後から見ると漏れが隠れる。Wayland 用は起動の試験では読み込まれないので、
-      #      ここでしか捕まえられない
-      #   2. xvfb を入れ、窓を出して描けるかを見る
-      #
-      # 2026-10-09 に手元の podman で、v2.1.1 の deb が 1 で 4 つの漏れを指摘して落ち、
-      # 依存を足すと通ること、GPU 系を消しても CPU 描画で 2 が通ることを確かめた
-      #
-      # **`--init` を外さない。** 外すと `bash -c` が最後の `xvfb-run` を exec して
-      # PID 1 にし、Xvfb の準備完了の合図（SIGUSR1）が届かずに永久に待つ
-      # （手元で 19 分止まった。2026-10-09）。止まっても早く切れるよう上限も置く
+      # **まっさらな環境（Debian 13）に依存だけを入れ、窓を出して描けるかを見る。**
+      # `--init` を外さない（外すと Xvfb の準備完了の合図が届かずに永久に待つ）
       - name: まっさらな環境で deb を起動する
-        if: runner.os == 'Linux'
+        if: env.PACKAGE == 'true' && runner.os == 'Linux'
         timeout-minutes: 10
         run: |
           set -eu
@@ -306,7 +325,7 @@ jobs:
                 python3 tools/automation/launch_check.py /usr/bin/mdview "$VERSION"'
 
       - name: AppImage の煙試験
-        if: runner.os == 'Linux'
+        if: env.PACKAGE == 'true' && runner.os == 'Linux'
         run: |
           set -eu
           package=$(ls dist/*.AppImage)
@@ -314,15 +333,14 @@ jobs:
           # runner に FUSE が無いので展開して動かす
           APPIMAGE_EXTRACT_AND_RUN=1 "$package" --version
 
-      # --- macOS の包み（B-6） ---
       - name: dmg を組む
-        if: runner.os == 'macOS'
+        if: env.PACKAGE == 'true' && runner.os == 'macOS'
         run: |
           bash packaging/macos/build-dmg.sh \
-            "target/${{ matrix.target }}/dist/mdview" dist
+            "target/${{ matrix.target }}/${{ env.PROFILE }}/mdview" dist
 
       - name: dmg の煙試験
-        if: runner.os == 'macOS'
+        if: env.PACKAGE == 'true' && runner.os == 'macOS'
         run: |
           set -eu
           package=$(ls dist/*.dmg)
@@ -336,14 +354,11 @@ jobs:
           test -x "$app/Contents/MacOS/mdview" || { echo "起動用が無い"; exit 1; }
           test -x "$editor/Contents/MacOS/mdview" || { echo "本体が無い"; exit 1; }
           test -f "$app/Contents/Resources/mdview.icns" || { echo "アイコンが無い"; exit 1; }
-          # **plist が壊れていないか確かめる。** 壊れていると起動すらしない
           plutil -lint "$app/Contents/Info.plist"
           plutil -lint "$editor/Contents/Info.plist"
-          # **本体は別のバンドル ID**（同じだと Finder の開く要求が本体へ行く。R-08）
           outer=$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")
           inner=$(plutil -extract CFBundleIdentifier raw "$editor/Contents/Info.plist")
           [ "$outer" != "$inner" ] || { echo "バンドル ID が同じ: $outer"; exit 1; }
-          # 本体を直に、そして起動用越しに（引数があれば本体に置き換わる）
           "$editor/Contents/MacOS/mdview" --version
           "$app/Contents/MacOS/mdview" --version | grep -q "^mdview " \
             || { echo "起動用が本体へ引数を渡せない"; exit 1; }
@@ -351,27 +366,23 @@ jobs:
           hdiutil detach "$mount" -quiet
           echo "開いて・起動できた"
 
-      # --- Windows のインストーラ（B-3） ---
-      #
-      # **署名しない**（§27.4）。受け取った側の警告の外し方は Release の
-      # 説明文に入れる
+      # **署名しない**（§27.4）。受け取った側の警告の外し方は Release の説明文に入れる
       - name: Inno Setup を入れる
-        if: runner.os == 'Windows'
+        if: env.PACKAGE == 'true' && runner.os == 'Windows'
         run: choco install innosetup -y --no-progress
 
       - name: インストーラを組む
-        if: runner.os == 'Windows'
+        if: env.PACKAGE == 'true' && runner.os == 'Windows'
         shell: pwsh
         run: |
           packaging/windows/build-installer.ps1 `
-            -SourceExe "target/${{ matrix.target }}/dist/mdview.exe" `
+            -SourceExe "target/${{ matrix.target }}/${{ env.PROFILE }}/mdview.exe" `
             -OutputDir dist
 
-      # **入れて・起動して・消せるかを確かめる**（B-8）。
-      # ここを作らないと、壊れたインストーラをそのまま配ることになる。
-      # 画面が無いので、起動の確認は `--version` で行う
+      # 入れて・起動して・消せるかを確かめる。答えは .NET の Process で受け取る
+      # （本体は GUI のアプリなので `& $exe --version` では空になる）
       - name: 入れて消す煙試験
-        if: runner.os == 'Windows'
+        if: env.PACKAGE == 'true' && runner.os == 'Windows'
         shell: pwsh
         run: |
           $setup = Get-ChildItem dist/*-setup.exe | Select-Object -First 1
@@ -382,12 +393,6 @@ jobs:
           $exe = "$env:LOCALAPPDATA\Programs\mdview\mdview.exe"
           if (-not (Test-Path $exe)) { throw "入ったはずの $exe が無い" }
 
-          # **答えは .NET の Process で、標準出力をつないで受け取る。**
-          #
-          # 本体（mdview.exe）は v2.1.3 から GUI のアプリなので、`$v = & $exe --version` では
-          # PowerShell が標準出力をつながずに起こし、答えが空（null）になる。しかも
-          # `$null -notmatch '...'` は偽に見えるため、版数の確認をすり抜けていた
-          # （公開側の CI で、mdview.com との比べで初めて落ちた）
           function Get-Answer([string]$Path, [string]$Argument) {
             $info = New-Object System.Diagnostics.ProcessStartInfo
             $info.FileName = $Path
@@ -402,15 +407,12 @@ jobs:
             return $out.Trim()
           }
 
-          # **版数は完全に一致するかで見る**（空や別の版をすり抜けさせない）
           $expected = "mdview " + ((Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"(.+)"' |
             Select-Object -First 1).Matches[0].Groups[1].Value)
           $version = Get-Answer $exe '--version'
           Write-Host "起動できた: $version"
           if ($version -ne $expected) { throw "版数が違う: [$version]（期待: $expected）" }
 
-          # **端末用の入口（mdview.com）も入っていて、答えを返すか**（v2.1.3）。
-          # 本体は GUI のアプリなので、端末で打つとこちらが起きる
           $console = "$env:LOCALAPPDATA\Programs\mdview\mdview.com"
           if (-not (Test-Path $console)) { throw "入ったはずの $console が無い" }
           $answer = Get-Answer $console '--version'
@@ -421,9 +423,7 @@ jobs:
             Select-Object -First 1
           Start-Process -FilePath $uninstall.FullName `
             -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait
-          # **消えるまで待つ**（最大 60 秒）。Inno Setup のアンインストーラは自分を一時フォルダへ
-          # 写してすぐ戻るので、`-Wait` が効かない。決まった秒数だけ待つと、遅いランナーでは
-          # 消える前に見て落ちる
+          # 消えるまで待つ（アンインストーラは自分を写してすぐ戻るので `-Wait` が効かない）
           $deadline = (Get-Date).AddSeconds(60)
           while (((Test-Path $exe) -or (Test-Path $console)) -and (Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 2
@@ -432,189 +432,25 @@ jobs:
           if (Test-Path $console) { throw "消したはずの $console が 60 秒たっても残っている" }
           Write-Host "入れて・起動して・消せた"
 
-      # **release ジョブと release.yml はこの名前で探す。** 変えるなら両方とも直す
+      # **release ジョブはこの名前で探す**
       - uses: actions/upload-artifact@v7
+        if: env.PACKAGE == 'true'
         with:
           name: dist-${{ matrix.label }}
           path: dist/*
           if-no-files-found: error
 
-  # **モバイル版**（v3 R-03）。Android は署名した APK を `dist-android` に置き、Release に載せる。
-  # iOS は組めることまで（配らない。Apple の開発者登録が要る）。
+  # **本体の Release を作る**（2026-10-15）。**手で起動して Linux 以外を選んだときだけ**走る。
   #
-  # - **署名の鍵は Actions の秘密に置く**（リポジトリには置かない）。秘密が無い実行（PR など）は
-  #   署名せず、Release にも載せない（`dist-android` を作らない）
-  # - 本体（PC 版）の `check` とは別に動く。落ちても PC 版の配布は止めない
-  mobile:
-    name: モバイル版（${{ matrix.label }}）
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            label: android
-            target: aarch64-linux-android
-          - os: macos-latest
-            label: ios
-            target: aarch64-apple-ios-sim
-    env:
-      DIOXUS_CLI_VERSION: "0.7.10"
-    defaults:
-      run:
-        # bash と書くと pipefail が付く
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Rust と対象を入れる
-        run: |
-          rustup show
-          rustup target add ${{ matrix.target }}
-
-      - name: NDK の場所を決める（Android）
-        if: matrix.label == 'android'
-        # ランナーに入っている NDK を使う。C の部品（ring など）を NDK の clang で組む
-        run: |
-          ndk="$ANDROID_NDK_LATEST_HOME"
-          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          {
-            echo "NDK_HOME=$ndk"
-            echo "ANDROID_NDK_HOME=$ndk"
-            echo "JAVA_HOME=$JAVA_HOME_17_X64"
-            echo "CC_aarch64_linux_android=$bin/aarch64-linux-android26-clang"
-            echo "AR_aarch64_linux_android=$bin/llvm-ar"
-            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android26-clang"
-          } >> "$GITHUB_ENV"
-
-      # **同梱の字体はリポジトリに無い**。土台は `include_bytes!` で読むので、組む前に取る
-      - name: 同梱フォントのキャッシュ
-        id: fonts
-        uses: actions/cache@v6
-        with:
-          path: assets/fonts
-          key: fonts-${{ hashFiles('tools/fetch-fonts.py') }}
-
-      - name: 同梱フォントを取得する
-        if: steps.fonts.outputs.cache-hit != 'true'
-        run: python3 tools/fetch-fonts.py
-
-      - name: 同梱フォントを確認する
-        run: python3 tools/fetch-fonts.py --check
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: mobile -> target
-          key: mobile-${{ matrix.label }}
-
-      # 画面に依存しない所（ブロックの区切り・作業の印・出力）の試験と書式・Lint は、ランナーの上で流す
-      - name: 書式・Lint・試験（Android のジョブだけ）
-        if: matrix.label == 'android'
-        working-directory: mobile
-        run: |
-          cargo fmt --check
-          cargo clippy --no-default-features --all-targets -- -D warnings
-          cargo test --no-default-features
-          # APK・.app に入る依存の著作権表示の一覧（アプリに埋める）が古くないか
-          rustup target add aarch64-apple-ios
-          python3 ../tools/build-licenses.py --mobile --check
-
-      - name: Dioxus の CLI を入れる
-        run: |
-          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall -y --force "dioxus-cli@$DIOXUS_CLI_VERSION"
-          dx --version
-
-      - name: APK を組む（Android）
-        if: matrix.label == 'android'
-        working-directory: mobile
-        run: dx bundle --platform android --release --no-default-features --features mobile
-
-      - name: .app を組む（iOS のシミュレーター）
-        if: matrix.label == 'ios'
-        working-directory: mobile
-        run: dx build --platform ios --release --no-default-features --features mobile
-
-      # **秘密が無ければ署名しない**（PR・フォーク）。そのときは Release に載せない
-      - name: APK に署名する（Android）
-        if: matrix.label == 'android'
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -eu
-          apk=$(find mobile/target -name '*.apk' -path '*release*' | head -1)
-          test -n "$apk" || { echo "APK が見つからない"; find mobile/target -name '*.apk'; exit 1; }
-          echo "組んだ APK: $apk（$(du -h "$apk" | cut -f1)）"
-          mkdir -p out
-          cp "$apk" out/unsigned.apk
-          if [ -z "${KEYSTORE_BASE64:-}" ]; then
-            echo "署名の鍵（秘密）が無いので署名しない。Release にも載せない"
-            exit 0
-          fi
-          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          version=$(grep -m1 '^version' Cargo.toml | cut -d '"' -f 2)
-          mkdir -p dist
-          # **zipalign してから署名する**（apksigner の署名は整列のあとでないと壊れる）
-          "$tools/zipalign" -f -p 4 out/unsigned.apk out/aligned.apk
-          "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" \
-            --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD \
-            --out "dist/mdview-${version}-android.apk" out/aligned.apk
-          "$tools/apksigner" verify --print-certs "dist/mdview-${version}-android.apk"
-          rm -f "$RUNNER_TEMP/release.jks"
-
-      - name: 署名しない APK を残す（Android。確かめ用）
-        if: matrix.label == 'android'
-        uses: actions/upload-artifact@v7
-        with:
-          name: mobile-android-unsigned
-          path: out/unsigned.apk
-          retention-days: 14
-
-      # **release ジョブはこの名前（dist-*）で探す**。署名したときだけ出来る
-      - name: 署名した APK を Release へ回す（Android）
-        if: matrix.label == 'android' && hashFiles('dist/*.apk') != ''
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-android
-          path: dist/*.apk
-          if-no-files-found: error
-
-      - name: .app を残す（iOS。配らない）
-        if: matrix.label == 'ios'
-        run: |
-          set -eu
-          app=$(find mobile/target -name '*.app' -type d | head -1)
-          test -n "$app" || { echo ".app が見つからない"; exit 1; }
-          mkdir -p out
-          ditto -c -k --keepParent "$app" out/mdview-ios-simulator.zip
-          ls -l out
-
-      - uses: actions/upload-artifact@v7
-        if: matrix.label == 'ios'
-        with:
-          name: mobile-ios-simulator
-          path: out/*.zip
-          retention-days: 14
-
-  # **版数が新しければ、タグを打って Release を作る**（2026-10-13）。
+  # `check` が終わってから、一部の OS が落ちても走る（Windows がそろっていれば配る。
+  # 欠けた OS は説明文の先頭に書く。tools/release/make-release.sh）。
   #
-  # main への push のときだけ走る（PR・手動起動では走らない）。`check` が
-  # 終わってから、**一部の OS が落ちても走る**（Windows がそろっていれば配る。
-  # Linux / macOS が欠けたら説明文の先頭に書く。tools/release/make-release.sh）。
-  # 実行が取り消されたとき（手で取り消した・待っている間に次の push が来た）は走らない。
-  #
-  # Actions が打つタグでは、ほかのワークフローは起動しない（GitHub の決まり）。
-  # release.yml が重ねて走ることは無い
+  # **名前は版数に英字を付ける**（`v2.2.1a`）。公開側の `v2.2.1` と区別するため。
+  # 同じ版数で作り直すたびに次の英字にする（`b`、`c` …）ので、前のものは消さずに残る
   release:
-    name: タグと Release を作る
-    # モバイル版（v3 R-03）の署名した APK も待つ。落ちても PC 版は配る
-    needs: [check, mobile]
-    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    name: 本体の Release を作る
+    needs: check
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && (github.event.inputs.os != 'linux' || github.event.inputs.append_to != '') }}
     runs-on: ubuntu-latest
     permissions:
       # タグの push と Release の作成
@@ -624,33 +460,82 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 足すときは、足す先のタグのコミットとソースを比べる（履歴が要る）
+          fetch-depth: 0
 
-      - name: 配る版かを見る
+      - name: 名前を決める
         id: version
+        env:
+          APPEND_TO: ${{ github.event.inputs.append_to }}
         run: |
+          set -eu
           version=$(grep -m1 '^version' Cargo.toml | cut -d '"' -f 2)
-          tag="v$version"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          # **配った版は配り直さない。** タグが在れば何もしない（普段の push）。
-          # タグは Release を公開したときに出来る（下書きのうちは出来ない）ので、
-          # 途中で止まった下書きは「まだ配っていない」と見て作り直す
-          # **この実行のコミットが main の先頭でなければ配らない**（2026-10-20）。Actions のトークンは
-          # ブランチの先頭でないコミットへタグを打てず、Release を作る呼び出しが 403 で拒まれる
-          # （本体で踏んだ）。後から push した分の実行が、同じ版をまだ配っていないと見て配る
-          head=$(git ls-remote origin refs/heads/main | cut -f 1)
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
-            echo "$tag は配布済み。リリースしない（版数を上げれば配る）"
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          elif [ "$head" != "$GITHUB_SHA" ]; then
-            echo "$tag はまだ無いが、この実行（$GITHUB_SHA）は main の先頭（$head）ではない。後の実行に任せる"
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "$tag はまだ無い。配る"
-            echo "release=true" >> "$GITHUB_OUTPUT"
+
+          # --- あとから足す（v2.2.1a へ Linux 版を載せる など） ---
+          if [ -n "$APPEND_TO" ]; then
+            tag="$APPEND_TO"
+            case "$tag" in
+              "v${version}"[a-z]) ;;
+              *) echo "足す先は本体の Release の名前（v${version} に英字を付けたもの）: $tag"; exit 1 ;;
+            esac
+            gh release view "$tag" --json tagName > /dev/null \
+              || { echo "足す先の Release が無い: $tag"; exit 1; }
+            # **そのタグとアプリのソースが同じときだけ足す**（違うソースの物を混ぜない）。
+            # コミットそのものは比べない。タグから起動すると、そのコミットの古い ci.yml
+            # （足す機能が無い）で動いてしまうため。CI や文書だけを直したコミットからは足せる
+            git fetch --quiet --tags origin
+            commit=$(git rev-list -n 1 "$tag")
+            sources="src core Cargo.toml Cargo.lock build.rs rust-toolchain.toml packaging assets examples"
+            if ! git diff --quiet "$commit" "$GITHUB_SHA" -- $sources; then
+              echo "$tag（$commit）から、アプリのソースが変わっている。足せない:"
+              git diff --stat "$commit" "$GITHUB_SHA" -- $sources | tail -n 20
+              echo "版数を上げて新しく作るか、$tag と同じソースのコミットから起動する"
+              exit 1
+            fi
+            echo "足す先: $tag（$commit。この実行 $GITHUB_SHA とアプリのソースは同じ）"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "append=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # **使った英字は、タグと Release（下書きを含む）の両方から拾う**。下書きはタグを持たない
+          used=$(
+            {
+              git ls-remote --tags origin "refs/tags/v${version}*" | sed 's#.*refs/tags/##'
+              gh release list --limit 200 --json tagName --jq '.[].tagName'
+            } | grep -E "^v${version//./\\.}[a-z]$" | sed "s/^v${version}//" | sort -u || true
+          )
+          # **使った中でいちばん後ろの英字の次**にする（消したものの穴は埋めない。新しいほど後ろの英字）
+          last=$(printf '%s\n' "$used" | grep -E '^[a-z]$' | tail -n 1 || true)
+          tag=""
+          seen=""
+          [ -z "$last" ] && seen=yes
+          for letter in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+            if [ -n "$seen" ]; then
+              tag="v${version}${letter}"
+              break
+            fi
+            [ "$letter" = "$last" ] && seen=yes
+          done
+          if [ -z "$tag" ]; then
+            echo "v${version}a〜z を使い切った。版数を上げる"
+            exit 1
+          fi
+          echo "使った英字: ${used:-（無し）} → $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "append=false" >> "$GITHUB_OUTPUT"
+
+      # **足すときは、もとから載っている物も手元へ落とす**。照合値と説明文を全部で作り直すため。
+      # この実行の配布物を後から落とすので、同じ名前の物（組み直した OS）はこの実行の物が勝つ
+      - name: 足す先の配布物を落とす
+        if: steps.version.outputs.append == 'true'
+        run: |
+          set -eu
+          mkdir -p dist
+          gh release download "${{ steps.version.outputs.tag }}" --dir dist --pattern 'mdview-*'
+          ls -la dist
 
       - name: この実行の配布物を落とす
-        if: steps.version.outputs.release == 'true'
         # 全部の OS が落ちていると 1 つも無い。そのときは次の段が理由を出して止める
         continue-on-error: true
         uses: actions/download-artifact@v8
@@ -660,29 +545,54 @@ jobs:
           merge-multiple: true
 
       - name: 検査・照合値・説明文
-        if: steps.version.outputs.release == 'true'
-        run: bash tools/release/make-release.sh "${{ steps.version.outputs.tag }}" dist
+        env:
+          # **選ばなかった OS は失敗ではない**（説明文の断り書きの理由を差し替える）
+          ABSENT_REASON: "この Release では選んだ OS（${{ github.event.inputs.os }}）だけを組みました。選んでいない OS が落ちた場合も、ここに出ます。"
+        run: |
+          bash tools/release/make-release.sh "${{ steps.version.outputs.tag }}" dist
+          # **本体の Release であることを先頭に書く**（公開側の Release と取り違えない）
+          {
+            if [ "${{ steps.version.outputs.append }}" = "true" ]; then
+              echo "> **本体（開発用）の Release です。** 手で起動した CI が組みました（あとから ${{ github.event.inputs.os }} を足しました）。"
+            else
+              echo "> **本体（開発用）の Release です。** 手で起動した CI（${{ github.event.inputs.os }}）が組みました。"
+            fi
+            echo "> 公開側の \`v$(grep -m1 '^version' Cargo.toml | cut -d '"' -f 2)\` とは別のものです。"
+            echo
+            cat release-notes.md
+          } > release-notes.tmp
+          mv release-notes.tmp release-notes.md
 
       - name: タグを打って Release を作る
-        if: steps.version.outputs.release == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          APPEND: ${{ steps.version.outputs.append }}
         run: |
           set -eu
-          # **前に途中で止まった下書きがあれば消す**（タグはまだ無い）
-          if gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null | grep -qx true; then
-            echo "前の下書きを消す: $TAG"
-            gh release delete "$TAG" --yes
+          # **足すときは、載せ直して説明文を差し替えるだけ**（タグは既にある）。
+          # `--clobber` で同じ名前の物（照合値・組み直した OS）を置き換える
+          if [ "$APPEND" = "true" ]; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file release-notes.md
+            echo "足した: $(gh release view "$TAG" --json url --jq .url)"
+            gh release view "$TAG" --json assets --jq '.assets[].name'
+            exit 0
           fi
-          # プレリリース（`-alpha` など）はその印を付ける
-          flags=""
-          case "$TAG" in
-            *-*) flags="--prerelease" ;;
-          esac
+          # **この実行のコミットが main の先頭でなければ止める**（2026-10-20）。Actions のトークンは
+          # ブランチの先頭でないコミットへタグを打てず、Release を作る呼び出しが
+          # `HTTP 403: Resource not accessible by integration` で拒まれる（v2.3.0b で 3 回踏んだ。
+          # 走っている間に main へ push した）。組んだ物はこの実行の成果物に残っている
+          head=$(git ls-remote origin refs/heads/main | cut -f 1)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "この実行のコミット（$GITHUB_SHA）が main の先頭（$head）ではない。"
+            echo "Actions のトークンでは、先頭でないコミットに Release を作れない（403 になる）。"
+            echo "main の先頭から手動起動し直すか、この実行の成果物から手元の gh で作る（リリース手順 §7）"
+            exit 1
+          fi
           # **下書きで作って全部載せてから、公開する。** 公開したときに、この実行のコミット
-          # （試験して包んだもの）へタグが出来る。載せている途中で止まっても、
-          # 欠けた Release が公開されたり、タグだけが残ったりしない
+          # （試験して包んだもの）へタグが出来る。途中で止まっても、欠けた Release が
+          # 公開されたり、タグだけが残ったりしない
           gh release create "$TAG" dist/* --draft --target "$GITHUB_SHA" \
-            --title "$TAG" --notes-file release-notes.md $flags
+            --title "$TAG" --notes-file release-notes.md
           gh release edit "$TAG" --draft=false
           echo "作った: $(gh release view "$TAG" --json url --jq .url)"

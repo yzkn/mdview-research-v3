@@ -1,0 +1,200 @@
+[package]
+name = "mdview"
+version = "3.0.0"
+description = "Markdown viewer and editor"
+authors = []
+edition = "2021"
+publish = false
+# **`cargo run` で起こすのは本体。** 端末用の入口（src/bin/mdview-console.rs。
+# Windows の mdview.com）を足したので、指定しないとどちらか決められない
+default-run = "mdview"
+
+# **土台（UI に依存しない部分）は別のクレート**（v3 R-01）。PC 版とモバイル版で共有する。
+# 公開用の複製（migration-v2）・調査の一式（research-v3）・試作（poc）はそれぞれ自分の作業場なので外す
+[workspace]
+members = ["core"]
+exclude = ["migration-v2", "research-v3", "poc"]
+
+[dependencies]
+# 土台（v3 R-01）。本体からは `crate::parse` などの同じ道筋で使う（src/main.rs で読み直している）
+mdview-core = { path = "core" }
+# 本文の保持。10MB の文書を扱うため、文字列全体を作り直さない（§12.1）
+ropey = "1.6"
+# UI（DEC-202）。描画・入力・IME を担う
+# advanced: 自前ウィジェット（EditorView）を書くために要る。
+# 既製のウィジェットは 10MB に耐えないため自前実装が前提（§6）。
+# image-without-codecs: 図・数式・画像を画素で描くために要る（§16.12）。
+# **`image` にしない**（2026-10-16）。`image` は画像ライブラリの既定の形式を全部取り込み
+# （AV1・EXR・TIFF ほか）、実行ファイルが約 1 MB 大きくなる。アプリは画像を自分で読み
+# （下の `image` の形式だけ）、画素を渡して描くので、iced に画像を読ませない
+iced = { version = "0.14", features = ["advanced", "tokio", "image-without-codecs"] }
+# UAX #14 の行分割規則。日本語の基本的な禁則はここに含まれる（§3.2）
+unicode-linebreak = "0.1"
+# レイアウトキャッシュ（§3.8）
+lru = "0.18"
+# Markdown の解析（DEC-203）。可視範囲のインライン要素と、出力用の全文解析に使う。
+# 既定の機能だけで足りる（HTML 出力は使わない。§12.7）
+comrak = { version = "0.55", default-features = false }
+# コードブロックの着色（DEC-211）。構文定義 75 種が最初から入る。
+# **テーマは入れない。** 色は役割で持ち描画時に解決するため（§16.10）。
+# 正規表現は fancy-regex（純 Rust）を使う。onig は C の依存が増え、
+# 単一実行ファイル（+crt-static）と 3 OS のビルドを面倒にする
+syntect = { version = "5.3", default-features = false, features = [
+    "parsing",
+    "default-syntaxes",
+    "regex-fancy",
+] }
+# Mermaid の図（DEC-207）。v1 と同じ mermaid 11.17.2 に追従する純 Rust 実装
+merman = "0.9.0"
+# SVG のラスタライズ。画面表示と PDF 出力の双方で要る。
+# **0.45 に留める**（2026-10-16）。0.45 は iced（cosmic-text）と同じ版の `tiny-skia` 0.11・
+# `fontdb` 0.23・`rustybuzz` 0.20 を使うので、同じライブラリが 2 版入らない。0.48 にすると
+# `tiny-skia`・`fontdb`・`harfrust`・`usvg` が 2 版ずつになる。上げるのは iced が追い付いてから
+# （.github/dependabot.yml で 0.46 以上を除外している）
+resvg = "0.45"
+# merman のサイト設定（htmlLabels の一括無効化）を JSON で渡すため
+serde_json = "1"
+# MCP サーバー（v2.4.0 R-06）。公式の Rust SDK。stdio と、手元の HTTP（6d。Streamable HTTP）
+rmcp = { version = "3.6", default-features = false, features = ["server", "macros", "transport-io", "transport-streamable-http-server"] }
+# 手元の HTTP の受け口（6d）。**127.0.0.1 だけで待つ**
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+tower-service = "0.3"
+# URL から読む（v2.4.0 R-09。利用者が URL を指したときだけ）。証明書は OS の確かめ方に任せる。
+# **組み込みの証明書の一覧（webpki-roots）は入れない**（使わない。`rustls` の代わりに、その中身から一覧を除いて選ぶ）。
+# 中継は環境変数と、Windows のプロキシの設定（win-system-proxy）。`_ring` は ureq の `rustls` が使う暗号の部品
+ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "_ring", "platform-verifier", "gzip", "win-system-proxy"] }
+# 手元の HTTP の合言葉（6d。起動ごとに作る）
+getrandom = "0.3"
+# MCP の道具の引数を読む（rmcp の道具の引数は serde で受ける）
+serde = { version = "1", features = ["derive"] }
+# MCP サーバーを回す（`mdview --mcp` は窓を出さないので、iced の代わりに自分で回す）
+# 窓と MCP サーバーの通り道（6b。名前付きパイプ・UNIX ソケット）にも使う
+tokio = { version = "1", features = ["rt-multi-thread", "io-std", "io-util", "net", "time", "macros"] }
+# LaTeX 数式（DEC-210）。出力はすべて <path> で、描画に外部フォントが要らない
+latex-rust = "2.1"
+# 画像のデコード（§16.12）。**ネットワーク機能は使わない**
+# 既定の機能を切り、文書で使う形式だけ入れる
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "bmp",
+    "webp",
+] }
+# ファイル選択と確認のダイアログ（§14.1 / §18.2）。
+# **OS のものを使う。** 自前で描くと入力補完やネットワークの場所を作り直すことになる
+rfd = "0.17"
+# OS の外観（Light / Dark）の取得。iced は内部で追うがアプリへ渡す口が無い
+dark-light = "3"
+# 検索・置換の正規表現（§8.2）。**後戻りしない実装**を選ぶ。
+# fancy-regex（syntect が使う）は先読みが書けるが、書き方次第で
+# 10MB の文書に対して事実上終わらない照合になりうる
+regex = "1"
+# 日付・時刻の差し込み（TeraPad 相当）。**端末の時刻帯が要る**ため。
+# std だけでは地方時を出せない。既定の機能を切って clock だけ入れる
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# 文字コードの変換（利用者の要望。TeraPad に準じる）。
+# Shift_JIS / EUC-JP / ISO-2022-JP / UTF-16 を読み書きする。
+# **判定は自前**（§19.4）。encoding_rs は変換だけを担う
+encoding_rs = "0.8"
+# PDF の生成（DEC-205）。v1 の WebView 印刷に依存しない。
+# **同梱フォントをそのまま埋め込む**（サブセット化は krilla が行う。§8.5）
+krilla = "0.8"
+# クリップボードの画像を読む（v2.1.0 R-17）。**iced のクリップボードは文字しか扱えない**。
+# 既定の機能は画像の読み書きだけで、ネットワークには出ない
+arboard = { version = "3.6", default-features = false, features = ["image-data"] }
+similar = { version = "3.2.0", features = ["inline"] }
+# PPTX に埋め込む字体の字と字形の対応を引く（v2.8.0 R-04）。印に使う字の送り幅を測るのにも使う（examples/check-marks.rs）。
+# **新しいクレートは増えない**（resvg が同じ版を使っている）
+ttf-parser = "0.25"
+
+# 窓のハンドルを取る（v2.1.3）。iced は窓の小さいアイコンしか設定しないので、
+# タスクバーの大きいアイコンを自分で設定する。**iced が使っているのと同じ版**
+[target.'cfg(windows)'.dependencies]
+raw-window-handle = "0.6"
+# 中継先を OS（WinHTTP）に聞く（v2.6.0 R-02。自動構成スクリプトも OS が評価する）。
+# ごみ箱へ入れる（v2.7.0 R-03。Win32_UI_Shell）。**新しいクレートは増えない**（ほかの依存がすでに同じ版を使っている）
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinHttp", "Win32_UI_Shell"] }
+
+# 自動構成スクリプト（PAC）を評価する JavaScript の処理系（v2.8.0 R-06）。**Linux 版だけ**（Windows・macOS は OS が評価する）。
+# 純 Rust で C の部品が要らない。暦の拡張などは使わないので切る
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+boa_engine = { version = "0.22", default-features = false }
+
+[build-dependencies]
+# Windows の実行ファイルへアイコンと版数を埋める（B-2）。
+# **他の OS では何もしない**（build.rs が target_os を見る）
+embed-resource = "3"
+
+[dev-dependencies]
+# PAC の評価（v2.8.0 R-06）を、Linux 以外でも試験する。**Windows・macOS の実行ファイルには入らない**
+boa_engine = { version = "0.22", default-features = false }
+
+
+# 計測は必ずリリース相当の最適化で行う（§9.4）
+# 試験と開発ビルドのデバッグ情報は**行番号だけ**にする。
+#
+# 既定（debug = 2）では、このクレートを 1 つの試験用実行ファイルへまとめる
+# ときに rustc が数 GB を要求し、手元の端末でコミット不足になって
+# `STATUS_STACK_BUFFER_OVERRUN` で落ちる（§10.39）。
+# 行番号があればパニックの場所は分かるため、失うものは少ない。
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+opt-level = 3
+# **普段は thin**（組み立ての速さを優先する）。配る物は下の `dist` で fat にする
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# **配る物の組み方**（2026-10-16）。`cargo build --profile dist` で `target/<対象>/dist/` に出来る。
+#
+# release との違いは `lto = "fat"` だけ（下の大きさ優先の指定も引き継ぐ）。fat にすると
+# 実行ファイルが小さくなるが、組み立てが約 7.5 分から約 19.8 分に延びた（手元・-j 2）。
+# 普段の試験まで fat で組むと CI の実行分が延びるので、**配る物を組むときだけ**使う
+# （本体の CI は手で起動して Release を作るとき、公開側の CI はいつも）
+[profile.dist]
+inherits = "release"
+lto = "fat"
+
+# **画面の速さに関わらないものは、大きさを優先して最適化する**（2026-10-16）。
+#
+# Mermaid の図（merman 一式。実行ファイルの機械語の約半分）・数式・PDF の出力は、
+# 裏の糸か出力のときにしか動かない。編集・スクロール・プレビューの経路（iced・cosmic-text・
+# ropey・comrak・アプリ本体）は速さを優先したまま（opt-level = 3）にする
+[profile.release.package.merman]
+opt-level = "s"
+[profile.release.package.merman-core]
+opt-level = "s"
+[profile.release.package.merman-render]
+opt-level = "s"
+[profile.release.package.merman-elk-layered]
+opt-level = "s"
+[profile.release.package.merman-layout-elk]
+opt-level = "s"
+[profile.release.package.dugong]
+opt-level = "s"
+[profile.release.package.dugong-graphlib]
+opt-level = "s"
+[profile.release.package.manatee]
+opt-level = "s"
+[profile.release.package.lol_html]
+opt-level = "s"
+[profile.release.package.latex-rust]
+opt-level = "s"
+[profile.release.package.ratex-parser]
+opt-level = "s"
+[profile.release.package.ratex-layout]
+opt-level = "s"
+[profile.release.package.ratex-svg]
+opt-level = "s"
+[profile.release.package.ratex-lexer]
+opt-level = "s"
+[profile.release.package.krilla]
+opt-level = "s"
+[profile.release.package.subsetter]
+opt-level = "s"

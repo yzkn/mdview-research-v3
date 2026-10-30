@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>mdview モバイルの UI の試作（並べて見る）</title>
+<style>
+/* 試作（index.html）を、端末の大きさの枠に入れて並べる。?f=状態,状態…&w=幅&h=高さ
+   状態は index.html の # と ? を「?kbd=1#block」のように書く（, で区切る）。撮影にも使う */
+:root { --bg: #e9ebef; --fg: #333; }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 13px/1.4 "Yu Gothic UI", sans-serif; }
+.row { display: flex; gap: 16px; align-items: flex-start; }
+figure { margin: 0; }
+figcaption { margin: 0 0 6px; font-weight: 600; }
+iframe { border: 0; border-radius: 18px; background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,.18); display: block; }
+</style>
+</head>
+<body>
+<div class="row" id="row"></div>
+<script>
+const p = new URLSearchParams(location.search);
+const w = +(p.get("w") || 390), h = +(p.get("h") || 844);
+// ?bare=1: 枠だけを左上に置く（1 画面ずつ切り出して資料に使う）
+if (p.get("bare")) document.head.insertAdjacentHTML("beforeend", "<style>body{padding:0}.row{gap:0}figcaption{display:none}iframe{border-radius:0;box-shadow:none}</style>");
+const labels = { "#read": "読む", "#toc": "目次", "#search": "検索", "#edit": "直す面", "?kbd=1#block": "ブロックを直す",
+  "?kbd=1#full": "全文を直す", "?theme=dark#read": "暗い配色", "#split": "並べて直す" };
+for (const f of (p.get("f") || "#read").split(",")) {
+  const fig = document.createElement("figure");
+  fig.innerHTML = `<figcaption>${labels[f] || f}（${w}×${h}）</figcaption><iframe width="${w}" height="${h}" src="index.html${f.startsWith("?") ? f : "?" + f}"></iframe>`;
+  document.getElementById("row").append(fig);
+}
+</script>
+</body>
+</html>

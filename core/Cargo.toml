@@ -4,7 +4,7 @@ name = "mdview-core"
 # 土台の中の `CARGO_PKG_VERSION`（URL を読むときの User-Agent など）がこの値になるため
 version = "3.0.0"
 description = "mdview の土台（UI に依存しない部分）"
-authors = []
+authors = ["QES"]
 edition = "2021"
 publish = false
 license = "Apache-2.0"
@@ -18,15 +18,15 @@ iced = { package = "iced_core", version = "0.14" }
 # 絵文字の性質の表（v3 R-19。絵文字をつなぐ ZWJ・絵文字で描く字の見分け）。**新しいクレートは増えない**（cosmic-text が同じ版を使っている）
 unicode-properties = { version = "0.1", default-features = false, features = ["emoji"] }
 ropey = "1.6"
-# UAX #14 の行分割規則。日本語の基本的な禁則はここに含まれる（§3.2）
+# UAX #14 の行分割規則。日本語の基本的な禁則はここに含まれる（詳細設計書 §3.2）
 unicode-linebreak = "0.1"
-# レイアウトキャッシュ（§3.8）
+# レイアウトキャッシュ（詳細設計書 §3.8）
 lru = "0.18"
 # Markdown の解析（DEC-203）。可視範囲のインライン要素と、出力用の全文解析に使う。
-# 既定の機能だけで足りる（HTML 出力は使わない。§12.7）
+# 既定の機能だけで足りる（HTML 出力は使わない。詳細設計書 §12.7）
 comrak = { version = "0.55", default-features = false }
 # コードブロックの着色（DEC-211）。構文定義 75 種が最初から入る。
-# **テーマは入れない。** 色は役割で持ち描画時に解決するため（§16.10）。
+# **テーマは入れない。** 色は役割で持ち描画時に解決するため（基本設計書 §16.10）。
 # 正規表現は fancy-regex（純 Rust）を使う。onig は C の依存が増え、
 # 単一実行ファイル（+crt-static）と 3 OS のビルドを面倒にする
 syntect = { version = "5.3", default-features = false, features = [

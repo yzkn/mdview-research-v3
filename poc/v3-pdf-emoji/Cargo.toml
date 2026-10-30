@@ -1,0 +1,20 @@
+# v3 の M-7（PDF で絵文字を描く）の検証（調査用。配る物には入らない）。
+#
+# 出力のときに **OS の絵文字の字体**を読み、本体と同じ PDF の部品（krilla 0.8）で描けるかを 3 つの OS で見る。
+# 絵文字の字体は OS ごとに形式が違う（Windows: COLR、macOS: sbix、Linux: CBDT）
+[workspace]
+
+[package]
+name = "mdview-pdf-emoji-poc"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# 本体と同じ版。simple-text（字形を並べる）と raster-images（画像の字形）は既定の機能
+krilla = "0.8"
+# 字体の表を見て形式を知らせる（本体と同じ版）
+ttf-parser = "0.25"
+
+[profile.dev]
+debug = "line-tables-only"

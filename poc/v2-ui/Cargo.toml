@@ -1,0 +1,17 @@
+# v2.0.0 UI ツールキット選定 PoC（iced / egui）のワークスペース。
+# 本体（src-tauri）とは独立させ、選定が終わったら丸ごと捨てられるようにする。
+[workspace]
+resolver = "2"
+members = ["core", "egui-poc", "iced-poc", "parse-poc", "incparse-poc", "pdf-poc", "mermaid-poc", "math-poc", "hl-poc", "font-poc"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# PoC は「実測」が目的のため、必ずリリース相当の最適化で測る。
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

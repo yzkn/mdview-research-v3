@@ -1,4 +1,4 @@
-//! LaTeX の数式を描く（設計メモ DEC-210 / §7.4）。
+//! LaTeX の数式を描く（技術選定書 DEC-210 / §7.4）。
 //!
 //! latex-rust で SVG を作り、[`super::diagram::rasterize`] で画素へ落とす。
 //!
@@ -41,7 +41,7 @@ fn math_font() -> Result<&'static MathFont, String> {
 }
 
 impl MathRenderer {
-    /// 数式の SVG。**HTML 出力はこれをそのまま埋める**（§17A.2）。
+    /// 数式の SVG。**HTML 出力はこれをそのまま埋める**（基本設計書 §17A.2）。
     pub fn svg(&self, text: &str) -> Result<String, EmbedError> {
         let font = math_font().map_err(EmbedError::Failed)?;
         latex_to_svg(text.trim(), font, &SvgOptions::default())
@@ -152,7 +152,7 @@ mod tests {
     }
 }
 
-/// OPEN-211 / OPEN-212 の再測定（§7.4）。
+/// OPEN-211 / OPEN-212 の再測定（技術選定書 §7.4）。
 ///
 /// どちらも技術選定の時点で未解決のまま残った。実装時に測り直す。
 #[cfg(test)]

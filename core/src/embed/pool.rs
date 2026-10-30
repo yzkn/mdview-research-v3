@@ -1,4 +1,4 @@
-//! 埋め込み描画のワーカープール（§4.3）。
+//! 埋め込み描画のワーカープール（基本設計書 §4.3）。
 //!
 //! **UI スレッドを止めない**ことがすべてである。依頼は投げっぱなしにし、
 //! 結果は毎フレーム [`EmbedPool::poll`] で拾う。
@@ -25,12 +25,12 @@ pub enum JobState {
 
 type Completion = (EmbedKey, Result<RenderedEmbed, EmbedError>);
 
-/// 本文が変わってから描き直すまでの間（§16.12）。
+/// 本文が変わってから描き直すまでの間（基本設計書 §16.12）。
 ///
 /// **打鍵のたびに描くと、構文の途中の図が点滅する。**
 pub const DEBOUNCE: Duration = Duration::from_millis(300);
 
-/// 持っておく件数の上限（§16.8）。
+/// 持っておく件数の上限（基本設計書 §16.8）。
 pub const MAX_ENTRIES: usize = 200;
 
 /// 持っておく画素の合計（同上）。
@@ -142,7 +142,7 @@ impl EmbedPool {
         self.max_bytes = bytes;
     }
 
-    /// 本文が変わったことを伝える（§16.12）。
+    /// 本文が変わったことを伝える（基本設計書 §16.12）。
     ///
     /// **編集の入口から 1 度だけ呼ぶ。** ここから [`DEBOUNCE`] の間は
     /// 新しい依頼を投げずに溜める。
@@ -280,7 +280,7 @@ impl EmbedPool {
         }
     }
 
-    /// 上限を超えた分を古いものから捨てる（§16.8）。
+    /// 上限を超えた分を古いものから捨てる（基本設計書 §16.8）。
     ///
     /// **捨てられるのは「届いていて、いま要らないもの」だけである。**
     /// 未確定を捨てると結果が戻ってきたときに持ち主がおらず、
@@ -440,7 +440,7 @@ mod debounce_and_cap_tests {
         assert_eq!(settled, count, "結果が届かない");
     }
 
-    /// **編集中は投げない**（§16.12）。
+    /// **編集中は投げない**（基本設計書 §16.12）。
     ///
     /// 打鍵のたびに描くと、構文の途中の図が点滅する
     #[test]
@@ -525,7 +525,7 @@ mod debounce_and_cap_tests {
         assert_eq!(renderer.calls.load(Ordering::SeqCst), 1);
     }
 
-    /// **件数の上限を超えたら古いものから捨てる**（§16.8）。
+    /// **件数の上限を超えたら古いものから捨てる**（基本設計書 §16.8）。
     #[test]
     fn the_oldest_entries_are_dropped_past_the_count_limit() {
         let mut pool = EmbedPool::with_workers(Tally::new(4) as Arc<dyn RenderEmbed>, 1);
@@ -613,7 +613,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
-    /// **描画が落ちても理由が届き、糸は死なない**（§10.32）。
+    /// **描画が落ちても理由が届き、糸は死なない**（詳細設計書 §10.32）。
     ///
     /// 落ちた糸をそのままにすると、以後その分だけプールが痩せ、
     /// 図が「いつまでも描かれない」状態になる

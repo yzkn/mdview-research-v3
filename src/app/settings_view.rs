@@ -2152,7 +2152,7 @@ impl App {
                     SettingChange::UrlSystemProxy(d.url_system_proxy)
                 ),
             ),
-            note("ファイル → URL を開く…（Ctrl+Shift+L）で、URL の Markdown を読み取り専用で開きます。GitHub・GitLab・gist の画面の URL は中身の URL に読み替えます。画像を URL から取るのを入れると、ローカルの文書でも http:// https:// の画像を取りに行きます（業務の文書では外へ通信が出ることに気をつけてください）。"),
+            note("ファイル → URL を開く…（Ctrl+Shift+L）で、URL の Markdown を読み取り専用で開きます。GitHub・GitLab・gist の画面の URL は中身の URL に読み替えます。画像を URL から取るのを入れると、ローカルの文書でも http:// https:// の画像を取りに行きます（社内の文書では外へ通信が出ることに気をつけてください）。"),
             heading("外での変更"),
             with_reset(
                 toggle(

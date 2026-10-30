@@ -1,4 +1,4 @@
-//! 描画層。**iced に依存する唯一の層**（§4.2）。
+//! 描画層。**iced に依存する唯一の層**（基本設計書 §4.2）。
 //!
 //! レイアウト層はここに依存しない。PDF 出力が描画層を介さずレイアウト結果を
 //! 使えるようにするためである。
@@ -6,7 +6,7 @@
 // 幅を変えるつまみ（受入条件 §23.1）
 mod divider;
 mod editor;
-// 同梱フォント（§16.11）。描画・測定の双方がここを見る
+// 同梱フォント（基本設計書 §16.11）。描画・測定の双方がここを見る
 // 差分の地図（v2.3.0 R-02 e）
 pub mod diffmap;
 pub use mdview_core::render::emoji;
@@ -32,7 +32,7 @@ pub mod wrap;
 
 pub use divider::{Divider, WIDTH as DIVIDER_WIDTH};
 
-/// PDF 用の測定器（§17.3）。
+/// PDF 用の測定器（基本設計書 §17.3）。
 ///
 /// **画面と同じ規則で測る。** 別に作ると、画面と PDF で折り返しが変わる。
 /// 窓が無くても使えるのは、測定に要るのが「どの整形器を使うか」という型だけで、
@@ -52,7 +52,7 @@ pub use preview::{
 /// URL から取った結果（v2.4.0 R-09。頼んだ URL・行き着いた URL・中身。失敗なら理由）
 pub type UrlFetched = std::sync::Arc<Result<(String, String, Vec<u8>), String>>;
 
-/// アプリ全体のメッセージ（§6.4）。
+/// アプリ全体のメッセージ（詳細設計書 §6.4）。
 ///
 /// **本文（`String`）を載せない。** 10MB のコピーが発生するため、編集は
 /// 「何をどう変えるか」として運ぶ。
@@ -487,13 +487,13 @@ pub enum FileCommand {
     Open,
     Save,
     SaveAs,
-    /// BOM を付けて上書き保存する（§3.2）
+    /// BOM を付けて上書き保存する（基本設計書 §3.2）
     ///
     /// **すでに付いていれば増やさない。** BOM は 1 つだけ
     SaveWithBom,
-    /// PDF に出力する（§17）
+    /// PDF に出力する（基本設計書 §17）
     ExportPdf,
-    /// HTML に出力する（§17A）
+    /// HTML に出力する（基本設計書 §17A）
     ExportHtml,
     /// PPTX に出力する（v2.4.0 R-07 7e。Marp の文書だけ）
     ExportPptx,
@@ -519,7 +519,7 @@ pub enum SaveAs {
     Full(crate::io::Encoding, bool, crate::io::LineEnding),
 }
 
-/// 表示モード（§8）。
+/// 表示モード（基本設計書 §8）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ViewMode {
     Edit,

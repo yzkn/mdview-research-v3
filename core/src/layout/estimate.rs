@@ -1,10 +1,10 @@
-//! 高さの推定（§16.4）。
+//! 高さの推定（基本設計書 §16.4）。
 //!
 //! **行走査で得た情報だけから決める。** Markdown の解析を要しないことが条件で、
 //! これにより 10MB の全ブロックの高さを開いた直後に用意できる。
 //!
 //! 厳密さは要らない。目的は「推定が実測から大きく外れないこと」であり、
-//! 可視範囲に入ったブロックは実測値へ置き換わる（§16.2）。
+//! 可視範囲に入ったブロックは実測値へ置き換わる（基本設計書 §16.2）。
 
 use crate::parse::{Block, BlockKind};
 
@@ -87,7 +87,7 @@ pub fn estimate_height(block: &Block, source: &str, width: f32, metrics: &Metric
             lines * metrics.line_height
         }
         BlockKind::Code { .. } => {
-            // コードは折り返さない（§3.5）ので行数がそのまま効く
+            // コードは折り返さない（詳細設計書 §3.5）ので行数がそのまま効く
             block.line_count as f32 * metrics.code_line_height
         }
         // テキストの塊（v2.2.0）。**塊の間は空けない**

@@ -1,22 +1,59 @@
-# Rust のビルド成果物。
-#
-# **先頭の / を付けない。** 付けるとルート直下しか無視されず、
-# 下位のものを取りこぼす。
-target/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# 同梱フォント（DEC-209）。21.56MB あるため追跡しない。
+node_modules
+dist
+dist-ssr
+*.local
+coverage
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 署名証明書の出力先（配布物は src-tauri/target 配下）
+packaging/out/
+
+# 計測用に生成した Markdown（実装方針書 §8.4。MEASURE_OUT の既定の置き場）
+perf/out-*.md
+
+# v2 の性能計測用に生成する文書（再生成できるため追跡しない）
+perf/v2-*.md
+
+# Rust のビルド成果物。
+# **先頭の / を付けない。** 付けるとルート直下しか無視されず、
+# src-tauri/target のような下位のものを取りこぼす（実際に取り込む事故が起きた）。
+target/
+out-*.log
+
+# v1（Tauri）の残骸。ソースは削除済みだが、ビルドキャッシュと生成物が
+# ディスク上に残っている。追跡しない（不要なら手で削除してよい）。
+src-tauri/
+
+# 同梱フォント（技術選定書 DEC-209）。21.56MB あるため追跡しない。
 # **ビルド前に python tools/fetch-fonts.py で用意する。**
 # 版は固定してあり、取得時に SHA256 を照合する。
 assets/fonts/
 
-# 実行時のログ
-*.log
+# アイコンの生成物（原本は assets/*.svg）。
+# examples/make-icons.rs で作り直せるので持たない
+assets/icons/
 
-# 編集環境と OS が作るもの
-.vscode/
-.idea/
-.DS_Store
-*.sw?
+# 計測の出力物（PDF / HTML）。**作り直せるので持たない**
+perf/out/
 
 # Python の中間ファイル（tools/automation などを動かすとできる）
 __pycache__/

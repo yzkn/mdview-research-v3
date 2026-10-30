@@ -1,0 +1,9 @@
+[package]
+name = "pdf-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poc-core = { path = "../core" }
+krilla = "0.8"

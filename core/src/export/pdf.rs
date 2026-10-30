@@ -1,10 +1,10 @@
-//! PDF 出力（§17 / DEC-205）。
+//! PDF 出力（基本設計書 §17 / DEC-205）。
 //!
 //! **画面と同じレイアウトエンジンを使う**（§17.3）。用紙幅でレイアウトし直し、
-//! 得られた描画要素をページへ置く。別々にレイアウトすると、§9.2 が
+//! 得られた描画要素をページへ置く。別々にレイアウトすると、技術選定書 §9.2 が
 //! 警告する「見た目が 3 通りになる」問題が起きる。
 //!
-//! ページへの割り付けは `crate::paginate`（§5）が決める。
+//! ページへの割り付けは `crate::paginate`（詳細設計書 §5）が決める。
 //! ここは**置き場所が決まったものを krilla へ渡すだけ**にしてある。
 
 use super::emoji_text::FaceFont;
@@ -35,7 +35,7 @@ use super::ExportWatch;
 
 use super::front::{self, TocEntry};
 
-/// 本文の文字の大きさ（pt）。PoC（§8.5）と揃える。
+/// 本文の文字の大きさ（pt）。PoC（技術選定書 §8.5）と揃える。
 pub const BODY_SIZE: f32 = 10.5;
 /// ヘッダー・フッターの文字の大きさ（pt）。
 const CHROME_SIZE: f32 = 9.0;
@@ -320,7 +320,7 @@ fn header_cells(block: &LaidOutBlock) -> usize {
         .max(1)
 }
 
-/// レイアウト結果をページ分割の入力へ直す（§5.3）。
+/// レイアウト結果をページ分割の入力へ直す（詳細設計書 §5.3）。
 fn to_pieces(laid: &[Laid]) -> Vec<Piece> {
     laid.iter()
         .map(|item| {
@@ -425,7 +425,7 @@ pub fn export(
         for item in &page.items {
             let laid_block = &laid[item.piece].block;
 
-            // 表の続きではヘッダー行を先に描く（§5.3）
+            // 表の続きではヘッダー行を先に描く（詳細設計書 §5.3）
             let mut y = MARGIN + item.top;
             // **ヘッダーの段のセルを全部描く**（v3。以前は最初のセルだけだった）
             if item.repeats_header {
@@ -494,7 +494,7 @@ pub fn export(
                 );
             }
 
-            // しおり（§17.4）。**全 OS で出る**のが v1 との差（§20.1）
+            // しおり（§17.4）。**全 OS で出る**のが v1 との差（基本設計書 §20.1）
             if let BlockKind::Heading(level) = laid[item.piece].kind {
                 if item.lines.start == 0 {
                     // **飛び先は「出力した PDF の中の何ページ目か」。**
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!(count_pages(&bytes), 1);
     }
 
-    /// **明示的な改ページが効く**（§5.5）。
+    /// **明示的な改ページが効く**（詳細設計書 §5.5）。
     #[test]
     fn an_explicit_page_break_makes_two_pages() {
         let doc = document("前半\n\n<!-- pagebreak -->\n\n後半\n");

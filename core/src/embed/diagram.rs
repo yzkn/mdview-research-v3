@@ -1,4 +1,4 @@
-//! Mermaid の図を描く（設計メモ DEC-207 / §7.3）。
+//! Mermaid の図を描く（技術選定書 DEC-207 / §7.3）。
 //!
 //! merman で SVG を作り、resvg で画素へ落とす。
 //!
@@ -60,7 +60,7 @@ fn site_config() -> MermaidConfig {
 /// resvg に渡す設定。**同梱フォントを登録する。**
 ///
 /// システムフォントを読むと、日本語に中国語の字形が拾われる問題が戻る
-/// （§6.5.5 / DEC-208）。エディタ・プレビューと図で字形を揃えるため、
+/// （技術選定書 §6.5.5 / DEC-208）。エディタ・プレビューと図で字形を揃えるため、
 /// 本文と同じ IBM Plex Sans JP を既定にする。
 fn svg_options() -> &'static usvg::Options<'static> {
     static OPTIONS: OnceLock<usvg::Options<'static>> = OnceLock::new();
@@ -94,7 +94,7 @@ fn svg_options() -> &'static usvg::Options<'static> {
 /// レイアウトは幅に合わせて縮めるが、画素そのものを持つとメモリを食う。
 const MAX_PIXELS: u32 = 4_000;
 
-/// この図を描くか（設計メモ OPEN-210）。
+/// この図を描くか（技術選定書 OPEN-210）。
 ///
 /// **erDiagram は描かない。** merman は `er.htmlLabels: false` を渡しても
 /// foreignObject を残すため、ラベルが本文として出てこない。
@@ -123,7 +123,7 @@ fn svg_request() -> SvgRequest {
 }
 
 impl DiagramRenderer {
-    /// 図の SVG。**HTML 出力はこれをそのまま埋める**（§17A.2）。
+    /// 図の SVG。**HTML 出力はこれをそのまま埋める**（基本設計書 §17A.2）。
     ///
     /// 画面と PDF は画素へ落とすが、HTML はブラウザが描くので落とす必要が無い。
     /// 落とすと拡大に耐えなくなる
@@ -217,7 +217,7 @@ mod tests {
     use super::*;
     use crate::embed::EmbedKind;
 
-    /// **暗い画素**を数える（§7.3 と同じ指標）。
+    /// **暗い画素**を数える（技術選定書 §7.3 と同じ指標）。
     ///
     /// **透明でない画素を数えてはいけない。** merman の SVG は
     /// `background-color: white` で全面を塗る（`svg_request()` で頼んでいる）ため、字形が 1 つも無くても
@@ -356,7 +356,7 @@ mod tests {
 mod open_210 {
     use super::*;
 
-    /// **OPEN-210 の再現確認**（§7.3）。
+    /// **OPEN-210 の再現確認**（技術選定書 §7.3）。
     ///
     /// erDiagram だけ `er.htmlLabels: false` を渡しても foreignObject が
     /// 12 箇所残り、ラベルが欠けていた。いまも同じかを測る。

@@ -2,7 +2,7 @@
 name = "mdview"
 version = "3.0.0"
 description = "Markdown viewer and editor"
-authors = []
+authors = ["QES"]
 edition = "2021"
 publish = false
 # **`cargo run` で起こすのは本体。** 端末用の入口（src/bin/mdview-console.rs。
@@ -18,12 +18,12 @@ exclude = ["migration-v2", "research-v3", "poc", "mobile"]
 [dependencies]
 # 土台（v3 R-01）。本体からは `crate::parse` などの同じ道筋で使う（src/main.rs で読み直している）
 mdview-core = { path = "core" }
-# 本文の保持。10MB の文書を扱うため、文字列全体を作り直さない（§12.1）
+# 本文の保持。10MB の文書を扱うため、文字列全体を作り直さない（詳細設計書 §12.1）
 ropey = "1.6"
 # UI（DEC-202）。描画・入力・IME を担う
 # advanced: 自前ウィジェット（EditorView）を書くために要る。
-# 既製のウィジェットは 10MB に耐えないため自前実装が前提（§6）。
-# image-without-codecs: 図・数式・画像を画素で描くために要る（§16.12）。
+# 既製のウィジェットは 10MB に耐えないため自前実装が前提（技術選定書 §6）。
+# image-without-codecs: 図・数式・画像を画素で描くために要る（基本設計書 §16.12）。
 # **`image` にしない**（2026-10-16）。`image` は画像ライブラリの既定の形式を全部取り込み
 # （AV1・EXR・TIFF ほか）、実行ファイルが約 1 MB 大きくなる。アプリは画像を自分で読み
 # （下の `image` の形式だけ）、画素を渡して描くので、iced に画像を読ませない
@@ -45,7 +45,7 @@ serde = { version = "1", features = ["derive"] }
 # MCP サーバーを回す（`mdview --mcp` は窓を出さないので、iced の代わりに自分で回す）
 # 窓と MCP サーバーの通り道（6b。名前付きパイプ・UNIX ソケット）にも使う
 tokio = { version = "1", features = ["rt-multi-thread", "io-std", "io-util", "net", "time", "macros"] }
-# 画像のデコード（§16.12）。**ネットワーク機能は使わない**
+# 画像のデコード（基本設計書 §16.12）。**ネットワーク機能は使わない**
 # 既定の機能を切り、文書で使う形式だけ入れる
 image = { version = "0.25", default-features = false, features = [
     "png",
@@ -54,7 +54,7 @@ image = { version = "0.25", default-features = false, features = [
     "bmp",
     "webp",
 ] }
-# ファイル選択と確認のダイアログ（§14.1 / §18.2）。
+# ファイル選択と確認のダイアログ（基本設計書 §14.1 / §18.2）。
 # **OS のものを使う。** 自前で描くと入力補完やネットワークの場所を作り直すことになる
 rfd = "0.17"
 # OS の外観（Light / Dark）の取得。iced は内部で追うがアプリへ渡す口が無い
@@ -103,12 +103,12 @@ resvg = "0.45"
 # **他の OS では何もしない**（build.rs が target_os を見る）
 embed-resource = "3"
 
-# 計測は必ずリリース相当の最適化で行う（§9.4）
+# 計測は必ずリリース相当の最適化で行う（詳細設計書 §9.4）
 # 試験と開発ビルドのデバッグ情報は**行番号だけ**にする。
 #
 # 既定（debug = 2）では、このクレートを 1 つの試験用実行ファイルへまとめる
 # ときに rustc が数 GB を要求し、手元の端末でコミット不足になって
-# `STATUS_STACK_BUFFER_OVERRUN` で落ちる（§10.39）。
+# `STATUS_STACK_BUFFER_OVERRUN` で落ちる（詳細設計書 §10.39）。
 # 行番号があればパニックの場所は分かるため、失うものは少ない。
 [profile.dev]
 debug = "line-tables-only"

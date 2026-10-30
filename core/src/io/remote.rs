@@ -3,7 +3,7 @@
 //! - 読めるのは `http://` と `https://` だけ
 //! - GitHub・GitLab・gist の画面の URL は、中身（raw）の URL に読み替える
 //! - 大きすぎるもの（`TEXT_LIMIT`・`IMAGE_LIMIT` 超）は読まない。待つのは `TIMEOUT` まで
-//! - 証明書は OS の確かめ方に任せる（業務の中継が差し込む証明書も、OS が信じていれば通る）
+//! - 証明書は OS の確かめ方に任せる（社内の中継が差し込む証明書も、OS が信じていれば通る）
 //! - 中継（プロキシ）は環境変数 `HTTPS_PROXY`・`HTTP_PROXY`・`NO_PROXY` に従い、無ければ（設定で入れていれば）
 //!   **OS に聞く**（Windows・macOS は自動構成スクリプト・自動検出・手動の設定のどれでも。Linux は GNOME の手動の設定。
 //!   v2.6.0 R-02・v2.7.0 R-04。`super::system_proxy`）

@@ -1,0 +1,9 @@
+[package]
+name = "hl-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Sublime 構文によるハイライト。既定の構文・テーマ一式を同梱できる。
+syntect = "5"

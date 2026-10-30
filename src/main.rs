@@ -1,9 +1,9 @@
 //! mdview（Markdown Viewer）。版数は `Cargo.toml` が唯一の出どころ。
 //!
 //! 設計は `design/` を参照する。
-//!   - 設計メモ: 何を使うか（DEC-201〜211）
-//!   - 設計メモ: どう構成するか
-//!   - 設計メモ: どう作るか
+//!   - 技術選定書: 何を使うか（DEC-201〜211）
+//!   - 基本設計書: どう構成するか
+//!   - 詳細設計書: どう作るか
 //!
 //! v2.1 の要件は `doc/v2.1.0の要件定義書.md`、変更の記録は `CHANGELOG.md`。
 //! 起動引数は下の `answer_without_a_window` の説明（`-h`）が正。
@@ -23,7 +23,7 @@ use mdview_core::document;
 // 編集の道具（TeraPad から取り込んだもの）
 use mdview_core::edit;
 use mdview_core::embed;
-// PDF・HTML 出力（§17）
+// PDF・HTML 出力（基本設計書 §17）
 use mdview_core::export;
 use mdview_core::io;
 use mdview_core::layout;
@@ -43,12 +43,12 @@ use mdview_core::parse;
 mod render;
 // 別の糸の後始末（落ちた理由を拾う）
 use mdview_core::worker;
-// 文書内検索（§15.5）
+// 文書内検索（基本設計書 §15.5）
 use mdview_core::search;
 
-/// プロセス開始時刻。起動〜初回描画の計測に使う（設計メモ DD-OPEN-01）。
+/// プロセス開始時刻。起動〜初回描画の計測に使う（詳細設計書 DD-OPEN-01）。
 ///
-/// PoC（§6.2）と同じ「初回の view() 呼び出しまで」を測るので、
+/// PoC（技術選定書 §6.2）と同じ「初回の view() 呼び出しまで」を測るので、
 /// 1,390 / 1,275ms という PoC の値と直接比較できる。
 pub static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
 
@@ -294,7 +294,7 @@ fn main() -> iced::Result {
         }
     }
 
-    // **落ちる前に書き出す口を仕掛ける**（§18.3）。
+    // **落ちる前に書き出す口を仕掛ける**（基本設計書 §18.3）。
     // 画面を出す前に仕掛けるのは、起動の途中で落ちても効かせるためである
     io::recover::arm();
 
@@ -343,8 +343,8 @@ fn main() -> iced::Result {
     // iced は `App::new` を窓と GPU の準備より前に呼ぶので、そこで読むと待ち時間に足される
     app::start_preload();
 
-    // **同梱フォントを読み込んでから窓を出す**（§16.11）。
-    // システムフォントに頼ると、日本語に中国語の字形が拾われる（§6.5.5）
+    // **同梱フォントを読み込んでから窓を出す**（基本設計書 §16.11）。
+    // システムフォントに頼ると、日本語に中国語の字形が拾われる（技術選定書 §6.5.5）
     // **窓の置き方は設定から決める**（v2.1.0 R-02 / R-05）。
     // 左半分・右半分は、窓が出てからアプリ側で寄せる
     let startup = io::settings::Settings::load();

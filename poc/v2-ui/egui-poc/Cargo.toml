@@ -1,0 +1,10 @@
+[package]
+name = "egui-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poc-core = { path = "../core" }
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.36"

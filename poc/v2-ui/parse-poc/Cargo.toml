@@ -1,0 +1,12 @@
+[package]
+name = "parse-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poc-core = { path = "../core" }
+# GFM 完全互換（表・チェックリスト・打ち消し線・脚注）。現行の markdown-it 相当の位置づけ。
+comrak = "0.55"
+# 速度重視の CommonMark パーサ。GFM は拡張で補う。comrak との速度差を見るために併記する。
+pulldown-cmark = "0.13"

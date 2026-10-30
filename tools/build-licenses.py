@@ -42,9 +42,14 @@ if MOBILE:
     OUTPUT = os.path.join(ROOT, "assets", "licenses", "mobile-third-party.json")
     TARGETS = ["aarch64-linux-android", "aarch64-apple-ios"]
     FEATURES = ["--no-default-features", "--features", "mobile"]
+    # **手続きマクロとその依存は数えない**。組み立てる PC の上で動くだけで APK・.app に入らず、
+    # しかも**組み立てる OS で選ばれる**（Windows で作ると windows-sys が入り、Linux の CI で「古い」と落ちた）
+    EDGES = "normal,no-proc-macro"
 else:
     WORKDIR = ROOT
     FEATURES = []
+    # PC 版は 3 つの OS を全部数えるので、組み立てる OS によらない
+    EDGES = "normal"
 
 # ライセンスの文書とみなす名前（フォルダーなら中のファイルを全部）
 LICENSE_FILE = re.compile(r"^(LICEN[CS]E|COPYING|NOTICE|UNLICENSE|COPYRIGHT)", re.IGNORECASE)
@@ -73,7 +78,7 @@ def run(*args):
 
 def used_packages():
     """実行ファイルに入る依存（名前・版）。自分自身は除く"""
-    args = ["tree", "--locked", "-e", "normal", "--prefix", "none", "-f", "{p}", *FEATURES]
+    args = ["tree", "--locked", "-e", EDGES, "--prefix", "none", "-f", "{p}", *FEATURES]
     for target in TARGETS:
         args += ["--target", target]
     used = set()

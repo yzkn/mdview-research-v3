@@ -1,7 +1,7 @@
-//! ブロックのレイアウト（§3.2 / §3.5 / §12.7）。
+//! ブロックのレイアウト（詳細設計書 §3.2 / §3.5 / §12.7）。
 //!
 //! 可視範囲に入ったブロックだけがここを通る。10MB でも 1 画面ぶん
-//! （20〜60 件）しか呼ばれない（§16.6）。
+//! （20〜60 件）しか呼ばれない（基本設計書 §16.6）。
 //!
 //! 原文をそのまま並べるのではなく、**インライン解析の結果を並べる**。
 //! `**太字**` は「太字」と表示され、記法そのものは消える。
@@ -57,7 +57,7 @@ pub struct TextRun {
     pub decoration: RunDecoration,
     /// 字句の役割（コードブロックの着色。DEC-211）。
     ///
-    /// **色そのものは持たない。** §16.10 のとおり、
+    /// **色そのものは持たない。** 基本設計書 §16.10 のとおり、
     /// 実際の色は描画時にテーマで解決する。
     pub role: TokenRole,
     /// 行の左端からの相対 X
@@ -522,7 +522,7 @@ fn image_source(
             .map_or(width, |wanted| wanted.min(width));
         return Some(EmbedSource::new(EmbedKind::Image, url, width));
     }
-    // **ネットワークは最初から取りに行かない**（§16.12）
+    // **ネットワークは最初から取りに行かない**（基本設計書 §16.12）
     if crate::embed::is_remote(reference) {
         return None;
     }
@@ -537,7 +537,7 @@ fn image_source(
     Some(EmbedSource::new(EmbedKind::Image, path.to_string_lossy(), width).with_stamp(stamp))
 }
 
-/// 埋め込みを 1 つ置く（§16.5）。
+/// 埋め込みを 1 つ置く（基本設計書 §16.5）。
 ///
 /// 結果が届くまでは**寸法が確定したプレースホルダ**を置く。
 /// 届いたら実寸へ置き換わり、高さ索引が直る（§3.7 のアンカー補正）。
@@ -2146,7 +2146,7 @@ graph TD; A-->B
         assert_eq!(request.width, 800.0);
     }
 
-    /// **画像だけの段落は箱にする**（§16.12）。
+    /// **画像だけの段落は箱にする**（基本設計書 §16.12）。
     #[test]
     fn lone_image_paragraph_is_an_embed() {
         let text = "![図](img/a.png)\n";

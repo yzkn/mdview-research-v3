@@ -1,6 +1,6 @@
-//! エディタウィジェット（§4）。
+//! エディタウィジェット（詳細設計書 §4）。
 //!
-//! iced の既製ウィジェットは 10MB に耐えないため自前で実装する（§6）。
+//! iced の既製ウィジェットは 10MB に耐えないため自前で実装する（技術選定書 §6）。
 //!
 //! 要点は 3 つ。
 //!
@@ -36,7 +36,7 @@ const OVERFLOW_MARK_HEIGHT: f32 = 10.0;
 /// キャレットを追うときに右端へ残す余白（px）。
 const CARET_MARGIN: f32 = 24.0;
 
-/// エディタの状態。`Document` とは別に持つ（§4.1）。
+/// エディタの状態。`Document` とは別に持つ（詳細設計書 §4.1）。
 #[derive(Debug, Clone, Default)]
 pub struct EditorState {
     /// 画面最上部の行番号。行高が一定なので行番号で持てる
@@ -158,7 +158,7 @@ impl EditorState {
     }
 }
 
-/// カーソルをどう動かしたいか（§4.4）。
+/// カーソルをどう動かしたいか（詳細設計書 §4.4）。
 ///
 /// **解決はアプリ層で行う。** 行の長さや行数の判断を 1 か所へ集めるためで、
 /// ウィジェットは意図だけを伝える。
@@ -332,7 +332,7 @@ pub enum Action {
     PickCompletion(usize),
 }
 
-/// IME から届く出来事（§4.5 の状態遷移）。
+/// IME から届く出来事（詳細設計書 §4.5 の状態遷移）。
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImeAction {
     Opened,
@@ -405,7 +405,7 @@ pub struct EditorView<'a> {
     show_gutter: bool,
     /// 検索の一致（原文のバイト範囲）。可視行のぶんだけ描画時に使う
     matches: &'a [Match],
-    /// いま選んでいる一致。**別色で描く**（§8.2）
+    /// いま選んでいる一致。**別色で描く**（基本設計書 §8.2）
     current_match: Option<Match>,
     /// キーを本文への入力として扱うか
     accept_keys: bool,
@@ -458,7 +458,7 @@ impl<'a> EditorView<'a> {
             document,
             state,
             // **等幅は同梱の PlemolJP を使う。** iced の既定はシステムフォントで、
-            // 日本語に中国語の字形が拾われる（§6.5.5）
+            // 日本語に中国語の字形が拾われる（技術選定書 §6.5.5）
             font: super::fonts::mono(),
             text_size: Self::BASE_SIZE,
             line_height: Self::BASE_LINE_HEIGHT,
@@ -1669,7 +1669,7 @@ impl<'a> EditorView<'a> {
         self
     }
 
-    /// 検索の一致を渡す（§15.5）。
+    /// 検索の一致を渡す（基本設計書 §15.5）。
     ///
     /// **可視行のぶんだけ描画時に重ねる。** 文書全体の強調を作り置きしない
     pub fn highlight(mut self, matches: &'a [Match], current: Option<Match>) -> Self {
@@ -2661,7 +2661,7 @@ where
         };
 
         match event {
-            // --- IME（§4.5） ---
+            // --- IME（詳細設計書 §4.5） ---
             Event::InputMethod(ime) if self.accept_keys && !shell.is_event_captured() => {
                 let action = match ime {
                     input_method::Event::Opened => ImeAction::Opened,
@@ -3049,7 +3049,7 @@ where
         }
 
         // **毎フレーム、キャレットの矩形を OS へ通知する**（§4.5）。
-        // これを怠ると変換候補の窓が画面の隅に出る（§6.5 の確認項目 2）。
+        // これを怠ると変換候補の窓が画面の隅に出る（技術選定書 §6.5 の確認項目 2）。
         let (caret_x, caret_y) = self.caret_position::<Renderer>(bounds);
 
         shell.request_input_method(&InputMethod::Enabled {
@@ -3266,7 +3266,7 @@ where
 
                     // 目 grep（v2.3.0 R-05）。検索の一致より下に敷く
                     self.draw_eye_marks::<Renderer>(renderer, &rendered, left, y);
-                    // 検索の一致（§15.5）。**本文の下へ敷く**
+                    // 検索の一致（基本設計書 §15.5）。**本文の下へ敷く**
                     self.draw_matches::<Renderer>(
                         renderer, &rendered, line_index, left, y, text_color,
                     );
@@ -3596,7 +3596,7 @@ const MINIMAP_MATCH: Color = Color {
     a: 0.45,
 };
 
-/// 現在位置の地色。**他の一致とは別色にする**（§8.2）。
+/// 現在位置の地色。**他の一致とは別色にする**（基本設計書 §8.2）。
 ///
 /// **青にする**（v2.8.1 R-03）。前は橙で、比べる画面の違いの色（赤・緑・黄・橙）と見分けにくかった。
 /// 半透明なので、明るいテーマでも暗いテーマでも字は読める
@@ -3656,7 +3656,7 @@ fn draw_text<Renderer>(
 /// ホイール 1 回ぶんを「何行」「横に何 px」へ直す。
 ///
 /// 戻りは `(行, 横の px)`。**どちらも丸めない**——端数はアプリ層で
-/// 繰り越す（`Action::Scrolled`。§10.10）。
+/// 繰り越す（`Action::Scrolled`。詳細設計書 §10.10）。
 ///
 /// # 縦と横は選ぶものではない
 ///
@@ -3911,7 +3911,7 @@ impl LineEndMark {
 /// 置いていたが、同梱フォントはこれを**見える枠として描く**ため、
 /// 全角括弧などの上に空白の印が重なって見えた（利用者の指摘）。
 /// 半角 2 つで幅が合うのは、同梱フォントが半角と全角を 1 対 2 で
-/// 作っているためである（§6.5）。
+/// 作っているためである（技術選定書 §6.5）。
 ///
 /// **全角の空白そのものにも印を置かない**（§10.50）。同梱フォントが
 /// 破線の枠として描くので、本文を見れば分かる。重ねると二重に見えるうえ、

@@ -1,0 +1,10 @@
+[package]
+name = "iced-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poc-core = { path = "../core" }
+# tokio: iced::time::every（一定間隔の再描画駆動）に非同期ランタイムが要るため。
+iced = { version = "0.14", features = ["tokio"] }

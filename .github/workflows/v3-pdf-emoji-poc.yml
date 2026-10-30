@@ -1,0 +1,91 @@
+# v3 の M-7（PDF で絵文字を描く）の検証（調査用。本体の CI とは別）。
+#
+# 出力のときに OS の絵文字の字体を読み、本体と同じ PDF の部品（krilla 0.8）で描けるかを 3 つの OS で見る。
+# 字体の形式が OS ごとに違う（Windows: COLR、macOS: sbix、Linux: CBDT）。手元の Windows では描けた（2026-10-28）。
+# **作った PDF と絵を成果物に残し、行ごとに色が出たかを要約に書く**
+name: v3 PDF emoji PoC
+
+on:
+  workflow_dispatch:
+  # 枝の名前は決めない（非公開の本体と、公開用のリポジトリの両方で流す）
+  push:
+    paths:
+      - "poc/v3-pdf-emoji/**"
+      - ".github/workflows/v3-pdf-emoji-poc.yml"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  pdf-emoji:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: poc/v3-pdf-emoji
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust を用意する
+        # 版数はリポジトリの rust-toolchain.toml に従う
+        run: rustup show
+
+      - name: Linux の絵文字の字体を入れる（Noto Color Emoji。CBDT）
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-color-emoji
+
+      - name: 絵にする道具（PyMuPDF・Pillow）
+        run: python -m pip install --quiet pymupdf pillow
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: poc/v3-pdf-emoji -> target
+          key: pdf-emoji
+
+      - name: "1. OS の絵文字の字体で PDF を作る"
+        id: pdf
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          cargo run --quiet -- out/emoji-${{ runner.os }}.pdf | tee out/run.log
+
+      - name: "2. PDF を絵にして、行ごとに色を数える"
+        id: check
+        if: steps.pdf.outcome == 'success'
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python check.py out/emoji-${{ runner.os }}.pdf out/emoji-${{ runner.os }}.png | tee out/rows.md
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mdview-v3-pdf-emoji-${{ runner.os }}
+          path: poc/v3-pdf-emoji/out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: 要約
+        if: always()
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          {
+            echo "## ${{ runner.os }}（PDF の絵文字）"
+            echo "|段|結果|"
+            echo "|---|---|"
+            echo "|1. PDF を作る|${{ steps.pdf.outcome }}|"
+            echo "|2. 絵にして数える|${{ steps.check.outcome }}|"
+            echo
+            if [ -f out/run.log ]; then grep -E "^(字体|形式|PDF):" out/run.log | sed 's/^/- /'; fi
+            echo
+            if [ -f out/rows.md ]; then echo "|行|色の画素|判定|"; echo "|---|---|---|"; cat out/rows.md; fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,11 @@
+[package]
+name = "math-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# 純 Rust の LaTeX 数式レンダラ。SVG を出せる。
+latex-rust = "1.0"
+# 出た SVG を実際に描けるかの確認（§7.3 の Mermaid と同じ理由）。
+resvg = "0.45"

@@ -1,9 +1,9 @@
 //! レイアウト層。
 //!
-//! **描画層に依存しない**（§4.2）。iced の型をここへ持ち込まないことで、
+//! **描画層に依存しない**（基本設計書 §4.2）。iced の型をここへ持ち込まないことで、
 //! レイアウトをウィンドウ無しで単体試験でき、PDF 出力からも同じ結果を使える。
 //!
-//! P1 では高さ索引とアンカーまでを実装する。行分割・表の列幅は P2（§10）。
+//! P1 では高さ索引とアンカーまでを実装する。行分割・表の列幅は P2（詳細設計書 §10）。
 
 mod anchor;
 mod block;
@@ -14,7 +14,7 @@ pub mod face_measure;
 mod height_index;
 pub mod measure;
 
-// P2 で描画層から使う。先に作って試験で挙動を固めてある（§10.3）
+// P2 で描画層から使う。先に作って試験で挙動を固めてある（詳細設計書 §10.3）
 #[allow(unused_imports)]
 pub use anchor::ScrollAnchor;
 pub use cache::{BlockKey, LayoutCache};
@@ -26,7 +26,7 @@ pub use block::{
     EmbedPlacement, FigureLayout, LaidOutBlock, LayoutContext, LineBox, PlainColors, RunDecoration,
     TextRun,
 };
-// 字句の役割は解析層が決め、描画層がテーマで色に変える（§16.10）
+// 字句の役割は解析層が決め、描画層がテーマで色に変える（基本設計書 §16.10）
 pub use crate::parse::highlight::TokenRole;
 pub use estimate::{estimate_height, Metrics};
 pub use height_index::HeightIndex;

@@ -1,19 +1,19 @@
-//! 入出力層（§19.3 / §19.4）。
+//! 入出力層（基本設計書 §19.3 / §19.4）。
 //!
 //! **ファイルの見た目を壊さない**ことが仕事である。
 //! BOM の有無と改行コードは読み取り時に覚え、保存時にそのまま戻す。
-//! 業務の文書では BOM 付き・CRLF の文書が普通にあり、開いて保存しただけで
+//! 社内では BOM 付き・CRLF の文書が普通にあり、開いて保存しただけで
 //! 差分が全行に出るのは受け入れられない。
 //!
-//! **iced を知らない。** ウィンドウ無しで試験できる（§4.2）。
+//! **iced を知らない。** ウィンドウ無しで試験できる（基本設計書 §4.2）。
 
 // 文字コードの判定と変換（§19.4）
 pub mod encoding;
-// 異常終了時の退避と復帰（§18.3）
+// 異常終了時の退避と復帰（基本設計書 §18.3）
 pub mod recover;
 // ファイルごとの位置の記憶（v3 R-10）
 pub mod positions;
-// 設定ファイル（§13.5）
+// 設定ファイル（基本設計書 §13.5）
 // OS の既定のアプリで開く
 pub mod launch;
 pub mod settings;
@@ -128,7 +128,7 @@ pub struct LoadedFile {
     pub truncated: Option<u64>,
 }
 
-/// 性能目標の基準（§19.3）。
+/// 性能目標の基準（基本設計書 §19.3）。
 pub const SIZE_WARNING: u64 = 10 * 1024 * 1024;
 
 /// 大きすぎるファイル（v3 R-12）で読む先頭の大きさ。**行の切れ目まで戻す**
@@ -315,7 +315,7 @@ pub fn encode_for_save(text: &str, format: &FileFormat) -> Result<Vec<u8>, LoadE
         .map_err(|error| LoadError::Unmappable(format!("{error}")))
 }
 
-/// Markdown として扱う拡張子（§19.3）。
+/// Markdown として扱う拡張子（基本設計書 §19.3）。
 pub const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 
 /// Markdown の拡張子か。

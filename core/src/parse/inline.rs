@@ -1,4 +1,4 @@
-//! 可視範囲のインライン解析（§12.7）。
+//! 可視範囲のインライン解析（詳細設計書 §12.7）。
 //!
 //! **ブロック単位で comrak にかける。** 設計は「可視範囲 64KB をまとめて」と
 //! 書いているが、ブロック単位のほうがレイアウトキャッシュ（§3.8）の粒度と
@@ -93,7 +93,7 @@ pub struct BlockContent {
     pub lines: Vec<LogicalLine>,
     /// **段落全体が画像 1 つ**だったときの参照先。
     ///
-    /// レイアウト層はこれを見て、段落ではなく画像の箱を置く（§16.12）。
+    /// レイアウト層はこれを見て、段落ではなく画像の箱を置く（基本設計書 §16.12）。
     /// 文章の途中にある画像はここに入らない。
     pub lone_image: Option<String>,
     /// `<img width="…">` で幅が指定されていれば、その幅（px。v2.1.0）
@@ -270,7 +270,7 @@ fn collect_table<'a>(node: &'a AstNode<'a>, out: &mut TableContent) {
     }
 }
 
-/// 入れ子の上限（§3.4）。異常な文書でレイアウトが破綻しないようにする。
+/// 入れ子の上限（詳細設計書 §3.4）。異常な文書でレイアウトが破綻しないようにする。
 const MAX_DEPTH: u8 = 8;
 
 /// ブロックの原文をインライン要素へ分解する。
@@ -583,7 +583,7 @@ fn collect_spans<'a>(node: &'a AstNode<'a>, outer: SpanStyle, out: &mut Vec<Span
                 collect_spans(child, style, out);
                 continue;
             }
-            // 生 HTML は表示しない（§3.3）。原文をそのまま出す
+            // 生 HTML は表示しない（基本設計書 §3.3）。原文をそのまま出す
             NodeValue::HtmlInline(html) => push(out, html, SpanStyle::Code),
 
             _ => {
@@ -647,7 +647,7 @@ fn emit_link(out: &mut Vec<Span>, url: &str, inner: Vec<Span>, inherited: SpanSt
 /// 画像の目印。**何の画像かが分かる文言にする。**
 ///
 /// `［画像］` だけでは、読み手は何が入るはずだったのか分からない。
-/// 取得しない外部画像は、**取得しないことを明示する**（§16.12）。
+/// 取得しない外部画像は、**取得しないことを明示する**（基本設計書 §16.12）。
 fn image_label<'a>(url: &str, node: &'a AstNode<'a>) -> String {
     let mut alt = String::new();
     for child in node.children() {

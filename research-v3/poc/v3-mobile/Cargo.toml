@@ -1,0 +1,11 @@
+# v3 のモバイル対応の実現可能性検証（調査用。配る物には入らない）。
+#
+# モバイルの試作（dioxus-app）が、本体の土台（../../core。v3 R-01 で切り出した mdview-core）を使って組めるかを確かめる。
+# 調査のときは本体のファイルを `#[path]` で読む写しを置いていたが、土台を切り出したので本物を使う（2026-10-29）
+[workspace]
+resolver = "2"
+members = ["dioxus-app"]
+exclude = ["iced-android"]
+
+[profile.dev]
+debug = "line-tables-only"

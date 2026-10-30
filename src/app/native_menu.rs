@@ -125,9 +125,12 @@ fn tidy(nodes: Vec<Node>) -> Vec<Node> {
 }
 
 impl App {
-    /// OS のメニューを使うか（macOS だけ。試験では使わない）
+    /// OS のメニューを使うか（macOS だけ。試験では使わない）。
+    ///
+    /// **試験の口（`--automation`）でも使わない**。GUI 試験は窓の中のメニューを押して操作し、OS のメニューは
+    /// 試験の口から押せない。使うと macOS の GUI 試験がメニューを見つけられずに落ちる（公開側の CI で踏んだ）
     pub(super) fn native_menu_bar(&self) -> bool {
-        cfg!(target_os = "macos") && !cfg!(test)
+        cfg!(target_os = "macos") && !cfg!(test) && !self.automation
     }
 
     /// OS のメニューの中身を作る

@@ -1,0 +1,47 @@
+# 依存関係の更新（基本設計書 §27）。
+#
+# 更新の量を抑えるため、パッチ・マイナーはまとめて 1 つの PR にする。
+# メジャー更新は影響が大きいため個別の PR とし、内容を確認してから取り込む。
+#
+# **間隔は「月 1 回」にしてある**（2026-10-06）。
+# 実測（2026-09-11〜10-06）では、**CI の 60 回中 32 回・130 分中 77 分が
+# dependabot の PR だった**。1 件の更新につき CI が 2 回走る（PR で 1 回、
+# main へ取り込んで 1 回）ためで、private リポジトリでは実行分が課金される。
+#
+# 週 1 回に戻すと約 4 倍になる。**更新の速さと実行分の釣り合いで決めた**もので、
+# 緊急の更新は dependabot を待たずに手で上げる。
+#
+# **v2.0.0 で npm と `/src-tauri` を外した。** どちらも無くなったため、
+# Dependabot が対象を見つけられずに失敗していた（実際に踏んだ。§27.7）。
+
+version: 2
+updates:
+  # 本体（Rust）。Cargo.toml はリポジトリの直下にある
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: monthly
+      time: "09:00"
+      timezone: Asia/Tokyo
+    # **同時に開く数も絞る。** 開いた数だけ CI が走る
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      cargo-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # **resvg は 0.45 に留める**（2026-10-16。core/Cargo.toml の注記。v3 R-01 で本体から土台へ移った）。0.46 以上は iced と別の版の
+    # tiny-skia・fontdb などを連れてきて、同じライブラリが 2 版入る（実行ファイルが大きくなる）
+    ignore:
+      - dependency-name: resvg
+        versions: [">=0.46"]
+
+  # ワークフローで使うアクション（§27.2 / §27.3）
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      timezone: Asia/Tokyo
+    commit-message:
+      prefix: "chore(ci)"

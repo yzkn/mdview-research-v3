@@ -1,0 +1,10 @@
+[package]
+name = "poc-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# 10MB 級の文書を扱うためのロープ。両 PoC で同一のバッファ実装を使い、
+# 差が「ツールキット側の描画コスト」だけになるようにする。
+ropey = "1.6"

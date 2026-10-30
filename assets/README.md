@@ -19,7 +19,7 @@ python tools/fetch-fonts.py
 |`IBMPlexSansJP-Regular.ttf` / `-Bold.ttf`|本文・見出し・UI|
 |`PlemolJP-OFL.txt` / `IBMPlexSansJP-OFL.txt`|ライセンス全文|
 
-選定の理由と方針は設計メモ DEC-209 / §7.6 を参照する。
+選定の理由と方針は技術選定書 DEC-209 / §7.6 を参照する。
 
 ### ライセンス
 
@@ -32,7 +32,7 @@ python tools/fetch-fonts.py
 
 **サブセット化は行わない。** PlemolJP は Reserved Font Name を宣言しており、
 改変すると同名を使えなくなる。また稀な漢字でシステムフォントに落ちると
-中国語字形が出る（§6.5.5 / DEC-208）。
+中国語字形が出る（技術選定書 §6.5.5 / DEC-208）。
 
 ## アイコン（B-1）
 

@@ -1,4 +1,4 @@
-//! アプリ層。状態・メッセージ・更新（§13.1）。
+//! アプリ層。状態・メッセージ・更新（詳細設計書 §13.1）。
 //!
 //! 窓 1 つぶんの状態（文書・エディタ・プレビュー・設定・ダイアログ）を持ち、
 //! `update` でメッセージを受けて状態を変える。画面の組み立ては `view`。
@@ -23,19 +23,19 @@ pub use file::Answer;
 use file::{decide, needs_save_as, DocumentMeta, Next, Pending};
 pub use menu::Menu;
 mod cursor;
-// 検索バーの状態（§8.2）
+// 検索バーの状態（基本設計書 §8.2）
 mod search;
-// エディタとプレビューの対応づけ（§16.14）
+// エディタとプレビューの対応づけ（基本設計書 §16.14）
 mod sync;
 // 出力範囲のダイアログ（SCR-005）
 mod export_dialog;
-// メニューの中身（§7.2）
+// メニューの中身（基本設計書 §7.2）
 pub mod menu;
 // 画面に出す知らせ
 mod notice;
-// 選択（§4.4 / §4.6）
+// 選択（詳細設計書 §4.4 / §4.6）
 pub(crate) mod selection;
-// ステータスバーの中身（§7.4）
+// ステータスバーの中身（基本設計書 §7.4）
 mod status;
 // 窓の題名とステータスバーの書式（v2.2.0）
 mod template;
@@ -46,7 +46,7 @@ mod browser;
 mod picker;
 // 目次の中身（受入条件 §23.1）
 mod toc;
-// 文書の状態とファイル操作の判断（§18.2）
+// 文書の状態とファイル操作の判断（基本設計書 §18.2）
 mod file;
 // v2.1.0
 // キー割り当て（R-10）
@@ -292,7 +292,7 @@ pub struct App {
     /// OS の外観が暗いか。**起動時に 1 度だけ見る**
     ///
     /// iced は OS のテーマを内部で追うが、アプリへ渡す口が無い。
-    /// §10.4 は「検知できない環境では次回起動時に反映する」
+    /// 基本設計書 §10.4 は「検知できない環境では次回起動時に反映する」
     /// としており、その扱いに寄せる
     system_dark: bool,
     /// 設定を変えた時刻。**1 秒のデバウンスで書く**（§13.5）
@@ -302,15 +302,15 @@ pub struct App {
     browser: Option<browser::Browser>,
     /// その答えを返す口。**一度だけ送る**
     browser_reply: Option<iced::futures::channel::oneshot::Sender<Option<std::path::PathBuf>>>,
-    /// スクロール性能の計測（`--bench-scroll`）。設計メモ PERF-02
+    /// スクロール性能の計測（`--bench-scroll`）。詳細設計書 PERF-02
     bench: Option<Bench>,
-    /// 図・数式・画像の非同期描画（§4.3）
+    /// 図・数式・画像の非同期描画（基本設計書 §4.3）
     embeds: EmbedPool,
     /// 目次の中身。**編集のたびに作り直さない**（閉じている間は空）
     toc: Vec<toc::Entry>,
     /// いまのウィンドウ幅。つまみの px を比率へ直すために持つ
     window_width: f32,
-    /// 検索の状態（§8.2）
+    /// 検索の状態（基本設計書 §8.2）
     search: search::SearchState,
     /// 出力の進み具合（§17.10）。出力中だけ入る
     export: Option<ExportJob>,
@@ -318,7 +318,7 @@ pub struct App {
     export_dialog: Option<export_dialog::ExportDialog>,
     /// 保存先を聞いたあと、保留していた操作へ戻るか
     resume_after_save: bool,
-    /// 取り消しとやり直し（§4.7）
+    /// 取り消しとやり直し（詳細設計書 §4.7）
     history: crate::document::history::History,
     /// 前回の異常終了で残ったもの（§18.3）。**答えるまで本文を触らせない**
     draft: Option<crate::io::recover::Draft>,
@@ -602,7 +602,7 @@ impl crate::export::ExportWatch for ExportWatcher {
 
 /// スクロール計測の状態。
 ///
-/// **PoC（§6.2）と同じ条件**にして直接比較できるようにする。
+/// **PoC（技術選定書 §6.2）と同じ条件**にして直接比較できるようにする。
 /// 1 フレーム 7 行ずつ送り、15 秒間続ける。
 struct Bench {
     started: std::time::Instant,
@@ -622,7 +622,7 @@ struct Bench {
 /// 貼り付ける文字列の改行を LF へそろえる。
 ///
 /// **他のアプリからは CRLF で来る。** そのまま入れると、保存のときに
-/// 行末が混ざった文書になる（§3.2 は文書ごとに 1 つと決めている）
+/// 行末が混ざった文書になる（基本設計書 §3.2 は文書ごとに 1 つと決めている）
 fn normalize_newlines(text: &str) -> String {
     if !text.contains('\r') {
         return text.to_owned();
@@ -1318,7 +1318,7 @@ impl App {
         };
     }
 
-    /// 未保存の確認（§18.2 / SCR-004）。
+    /// 未保存の確認（基本設計書 §18.2 / SCR-004）。
     ///
     /// **3 択である。** 保存して続ける / 破棄して続ける / 操作を中止する。
     /// 前回の異常終了で残ったものを、戻すか捨てるか尋ねる（§18.3）。
@@ -1591,7 +1591,7 @@ impl App {
         .into()
     }
 
-    /// 検索バー（§8.2）。
+    /// 検索バー（基本設計書 §8.2）。
     ///
     /// **表示モードは切り替えない。** 出している間は Enter が次の一致へ、
     /// 置換欄の Enter が 1 件置換、Esc が閉じるに割り当たる（§10.40）
@@ -1845,7 +1845,7 @@ impl App {
         .into()
     }
 
-    /// ステータスバーに出す一式（§7.4）。
+    /// ステータスバーに出す一式（基本設計書 §7.4）。
     fn status(&self) -> status::Status {
         status::Status {
             path: self.meta.path.clone(),
@@ -3231,7 +3231,7 @@ impl App {
                 max_top_line,
             } => {
                 // **端数を繰り越す。** 1 回ぶんを丸めると、高解像度ホイールで
-                // ゆっくり回したときに 1 行も動かない（§10.10）
+                // ゆっくり回したときに 1 行も動かない（詳細設計書 §10.10）
                 let step = crate::render::take_whole_lines(&mut self.editor.scroll_carry, lines);
                 if let (true, Some(wrap)) = (step != 0, self.wrap.as_ref()) {
                     // **折り返していれば見た目の段で動かす**（v2.2.0）。上限は最後の段
@@ -3354,7 +3354,7 @@ impl App {
         }
     }
 
-    /// プレビューからの通知（§3.7）。
+    /// プレビューからの通知（詳細設計書 §3.7）。
     fn apply_preview(&mut self, action: PreviewAction) {
         match action {
             // `handle` が先に受ける（開くには仕事を返す必要がある）
@@ -3428,7 +3428,7 @@ impl App {
         }
     }
 
-    /// IME の状態遷移（§4.5）。
+    /// IME の状態遷移（詳細設計書 §4.5）。
     fn apply_ime(&mut self, ime: ImeAction) {
         match ime {
             // **未確定文字列はロープに入れない。** 描画のためだけに持つ
@@ -3634,7 +3634,7 @@ impl App {
         (self.window_width - toc - crate::render::DIVIDER_WIDTH).max(MIN_SPLIT_AREA)
     }
 
-    /// 同期が効く場面か（§8 / §16.14）。
+    /// 同期が効く場面か（基本設計書 §8 / §16.14）。
     ///
     /// **分割表示のときだけ効く。** 片方しか見えていないなら合わせる相手がいない
     fn syncing(&self) -> bool {
@@ -3728,7 +3728,7 @@ impl App {
         self.editor.top_line = sync::to_editor(&self.document, self.preview.anchor);
     }
 
-    /// 走査をワーカーへ投げる（§15.5）。
+    /// 走査をワーカーへ投げる（基本設計書 §15.5）。
     ///
     /// **UI の糸では走査しない。** 10MB を舐めるため、打鍵のたびに止まる
     fn run_search(&mut self) -> Task<Message> {
@@ -4395,7 +4395,7 @@ impl App {
         1100.0
     }
 
-    /// ファイル操作を始める（§14.1 / §18.2）。
+    /// ファイル操作を始める（基本設計書 §14.1 / §18.2）。
     ///
     /// **未保存の確認はここに 1 か所だけ置く。** 操作ごとに書くと忘れる。
     fn start_file_command(&mut self, command: FileCommand) -> Task<Message> {
@@ -4434,7 +4434,7 @@ impl App {
 
     /// 内容を失いうる操作を始める。未保存なら確認を挟む。
     ///
-    /// **確認はアプリ内に描く**（§12 / SCR-004）。
+    /// **確認はアプリ内に描く**（基本設計書 §12 / SCR-004）。
     /// OS のメッセージダイアログを使うと、親ウィンドウを渡さない限り
     /// アプリの背面に出ることがあり、**本体が固まったように見える**
     /// （実際に踏んだ）。ファイル選択だけは OS のものを使う。
@@ -4897,7 +4897,7 @@ impl App {
         }
     }
 
-    /// PDF に出力する（§17）。
+    /// PDF に出力する（基本設計書 §17）。
     ///
     /// **未保存の確認は挟まない。** 出力は文書を変えないため、
     /// 保存していなくても、いま見えているものをそのまま出せばよい
@@ -5302,7 +5302,7 @@ impl App {
         self.adopt_settings(merged);
     }
 
-    /// いま使う外観（§10.4）。
+    /// いま使う外観（基本設計書 §10.4）。
     /// 編集画面の記法の色（v2.3.0 R-05 C-1）。**切っていれば `None`**（1 色で描く）。
     /// 自分の配色を使っていれば、その色で上書きする
     pub(super) fn syntax_colors(&self) -> Option<crate::render::syntax::SyntaxColors> {
@@ -5858,7 +5858,7 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        // 初回描画の時刻を 1 度だけ出す（設計メモ DD-OPEN-01）。
+        // 初回描画の時刻を 1 度だけ出す（詳細設計書 DD-OPEN-01）。
         //
         // **計測のときだけ出す**（v2.1.3。`MDVIEW_STARTUP_LOG=1`）。いつも出していたため、
         // 端末から起動すると経過時間が流れていた。`measure-startup.ps1` が立てる
@@ -5876,7 +5876,7 @@ impl App {
         });
 
         // 実描画回数を数える。**タイマーの刻み数とは一致しない**ため別に数える
-        // （PoC で 1 度取り違え、vsync を超える値が出た。§6.1）
+        // （PoC で 1 度取り違え、vsync を超える値が出た。技術選定書 §6.1）
         if let Some(bench) = &self.bench {
             bench.frames.set(bench.frames.get() + 1);
         }
@@ -6062,7 +6062,7 @@ impl App {
             None => preview.into(),
         };
 
-        // 表示モード（§8）
+        // 表示モード（基本設計書 §8）
         let main: Element<'_, Message> = match self.mode {
             ViewMode::Edit => editor.into(),
             ViewMode::Preview => preview,
@@ -6161,7 +6161,7 @@ impl App {
             column![container(self.chrome()).padding(6)]
         };
 
-        // 検索バー（§8.2）
+        // 検索バー（基本設計書 §8.2）
         // **本文の上の帯は一段浮かせる**（v2.3.0 R-12。検索・行へ移動・絞り込み）
         if self.search.open {
             body = body.push(fluent::float(focusable(self.search_view())));

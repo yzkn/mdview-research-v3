@@ -1,0 +1,9 @@
+[package]
+name = "font-poc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# iced（cosmic-text）が内部で使うフォントデータベース。読み込み経路を揃えるため直接使う。
+fontdb = "0.23"
