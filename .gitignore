@@ -20,6 +20,3 @@ assets/fonts/
 
 # Python の中間ファイル（tools/automation などを動かすとできる）
 __pycache__/
-
-# 試作の組み立てで集めた APK・.app（CI の中で作る）
-out/
