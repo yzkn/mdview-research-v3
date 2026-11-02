@@ -1622,3 +1622,33 @@ mod tests {
         assert_eq!(back_step(None, false), BackStep::Exit);
     }
 }
+
+#[cfg(test)]
+mod resource_tests {
+    /// Android の XML の注釈に `--` を書かない（Gradle の資源の組み立てが「The string "--" is not permitted
+    /// within comments」で止まる。v3.1 R-02 で踏んだ）
+    #[test]
+    fn android_xml_comments_have_no_double_hyphen() {
+        fn walk(dir: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, found);
+                } else if path.extension().is_some_and(|ext| ext == "xml") {
+                    found.push(path);
+                }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = vec![root.join("AndroidManifest.xml")];
+        walk(&root.join("src/android"), &mut files);
+        assert!(files.len() > 3, "{files:?}");
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            for comment in text.split("<!--").skip(1) {
+                let body = comment.split("-->").next().unwrap_or("");
+                assert!(!body.contains("--"), "{}: {body}", file.display());
+            }
+        }
+    }
+}
